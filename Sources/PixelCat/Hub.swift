@@ -144,6 +144,7 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
     var filter = 0          // 0 전체, 1 오늘, 2 남은 것
     var visible: [Int] = [] // 표의 줄 → 할 일 번호
     var addField: NSTextField?
+    var refocusBlank = false
 
     var popover: NSPopover?
     var duePicker: NSDatePicker?
@@ -458,13 +459,18 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
     }
 
     private func buildTodos() -> NSView {
+        // 목록 맨 아래에 늘 비어 있는 줄. 여기에 적고 Return 을 누르면 바로 추가되고 다음 빈 줄이 기다린다
         let add = NSTextField()
-        add.placeholderString = "Add a to-do and press Return"
+        add.placeholderString = "New to-do"
         add.target = self
         add.action = #selector(addFromField(_:))
         add.cell?.sendsActionOnEndEditing = false
         add.font = .systemFont(ofSize: 14)
-        add.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        add.isBordered = false
+        add.drawsBackground = false
+        add.focusRingType = .none
+        add.lineBreakMode = .byTruncatingTail
+        add.cell?.usesSingleLineMode = true
         addField = add
 
         let seg = NSSegmentedControl(labels: ["All", "Today", "Open"], trackingMode: .selectOne,
@@ -509,14 +515,13 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
 
         let stack = vstack([
             heading("To-Dos"),
-            hstack([add, button("Add", #selector(addFromButton), target: self)]),
             filterRow,
             scroll,
             hstack([keyed("td.clear", button("Clear Completed", #selector(AppDelegate.clearDone))),
                     keyed("td.bubble", button("Show on Cat", #selector(AppDelegate.toggleTodoBubble)))]),
         ], spacing: 12)
-        // 입력 줄, 거르기 줄, 표는 가로로 꽉 채운다
-        for v in [add.superview!, filterRow, scroll] {
+        // 거르기 줄과 표는 가로로 꽉 채운다
+        for v in [filterRow, scroll] {
             v.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
         }
         return stack
@@ -704,8 +709,8 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
         (controls["cp.size"] as? NSSegmentedControl)?.selectedSegment =
             sizes.firstIndex { $0.px == app.catView.px } ?? 0
         (controls["td.clear"] as? NSButton)?.isEnabled = todos.contains(where: \.done)
-        set("td.hint", filter == 0 ? "Drag to reorder · ★ marks today · ⏰ sets a reminder"
-            : "Switch to All to reorder")
+        set("td.hint", filter == 0 ? "Type in the last row and press Return · drag to reorder"
+            : "Type in the last row and press Return")
 
         // 집중
         let phase = app.focusPhase
@@ -755,14 +760,51 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
     func reloadTodos() {
         let todos = app.store.todos
         visible = todos.indices.filter { filter == 0 || (filter == 1 && todos[$0].isToday) || (filter == 2 && !todos[$0].done) }
+        // 빈 줄에 쓰고 있었거나 방금 추가했으면, 표를 다시 그린 뒤에도 빈 줄에 커서를 돌려놓는다
+        let wasTyping = ((window?.firstResponder as? NSTextView)?.delegate as? NSTextField) === addField && addField != nil
         table?.reloadData()
+        if wasTyping || refocusBlank {
+            refocusBlank = false
+            DispatchQueue.main.async { [weak self] in self?.focusBlankRow() }
+        }
         if window != nil { calendarPane.reload() }
         refresh()
     }
 
-    func numberOfRows(in tableView: NSTableView) -> Int { visible.count }
+    func numberOfRows(in tableView: NSTableView) -> Int { visible.count + 1 }  // 마지막은 늘 빈 줄
+
+    private func focusBlankRow() {
+        guard let table, let field = addField, window?.isVisible == true else { return }
+        table.scrollRowToVisible(visible.count)
+        _ = table.view(atColumn: 1, row: visible.count, makeIfNecessary: true)  // 빈 줄이 화면에 올라오게
+        guard field.window != nil else { return }
+        window?.makeFirstResponder(field)
+        field.currentEditor()?.selectedRange = NSRange(location: field.stringValue.count, length: 0)  // 쓰던 글 뒤에 커서
+    }
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
+        if row == visible.count {  // 새 할 일을 받는 빈 줄
+            switch tableColumn?.identifier.rawValue {
+            case "done":
+                let plus = label("+", size: 16, weight: .medium, color: .tertiaryLabelColor)
+                plus.alignment = .center
+                return plus
+            case "text":
+                guard let f = addField else { return nil }
+                let cell = NSView()
+                f.removeFromSuperview()
+                f.translatesAutoresizingMaskIntoConstraints = false
+                cell.addSubview(f)
+                NSLayoutConstraint.activate([
+                    f.leadingAnchor.constraint(equalTo: cell.leadingAnchor),
+                    f.trailingAnchor.constraint(equalTo: cell.trailingAnchor),
+                    f.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+                ])
+                return cell
+            default:
+                return nil
+            }
+        }
         guard row < visible.count, app.store.todos.indices.contains(visible[row]) else { return nil }
         let index = visible[row], todo = app.store.todos[index]
         switch tableColumn?.identifier.rawValue {
@@ -831,7 +873,7 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
 
     // 끌어서 순서 바꾸기 (전체 보기에서만)
     func tableView(_ tableView: NSTableView, pasteboardWriterForRow row: Int) -> NSPasteboardWriting? {
-        filter == 0 ? "\(row)" as NSString : nil
+        filter == 0 && row < visible.count ? "\(row)" as NSString : nil
     }
 
     func tableView(_ tableView: NSTableView, validateDrop info: NSDraggingInfo, proposedRow row: Int,
@@ -857,14 +899,9 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
     }
 
     @objc private func addFromField(_ sender: NSTextField) {
+        refocusBlank = !sender.stringValue.trimmingCharacters(in: .whitespaces).isEmpty
         addTodo(sender.stringValue)
         sender.stringValue = ""
-    }
-
-    @objc private func addFromButton() {
-        guard let field = addField else { return }
-        addFromField(field)
-        window?.makeFirstResponder(field)
     }
 
     @objc private func filterChanged(_ sender: NSSegmentedControl) {
@@ -1105,7 +1142,7 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
 
     @objc private func newTodo() {
         show(page: 1)
-        window?.makeFirstResponder(addField)
+        DispatchQueue.main.async { [weak self] in self?.focusBlankRow() }
     }
 
     // MARK: Quick add
@@ -1184,6 +1221,21 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
         duePicker?.dateValue = Date().addingTimeInterval(seconds)
         dueSet()
         return app.store.todos.first?.due != nil
+    }
+
+    // 시험용: 빈 줄에 글을 넣고 Return 을 누른 것과 같은 경로를 타고, 커서가 다시 빈 줄에 왔는지 알려 준다
+    func testBlankRow(_ text: String, then report: @escaping (Bool) -> Void) {
+        show(page: 1)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            guard let self, let field = self.addField else { return report(false) }
+            self.focusBlankRow()
+            field.stringValue = text
+            self.addFromField(field)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                let editing = ((self.window?.firstResponder as? NSTextView)?.delegate as? NSTextField) === field
+                report(editing && field.stringValue.isEmpty)
+            }
+        }
     }
 
     // MARK: Screenshots

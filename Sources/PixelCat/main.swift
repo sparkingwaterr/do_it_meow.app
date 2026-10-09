@@ -432,6 +432,7 @@ final class CatView: NSView {
 
 // 설명서에 넣을 화면을 찍는 모드. 진짜 할 일과 메모 대신 보기용 예시를 쓰고, 아무것도 저장하지 않는다
 let demoMode = ProcessInfo.processInfo.environment["PIXELCAT_SCREENSHOTS"] != nil
+    || ProcessInfo.processInfo.environment["PIXELCAT_DEMO"] != nil
 
 // MARK: - Todos
 
@@ -1231,6 +1232,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if let dir = env["PIXELCAT_SCREENSHOTS"] { self?.hub.snapshotAll(to: dir) { exit(0) } }
             if env["PIXELCAT_TEST_BALL"] != nil { self?.toggleBall() }
             if env["PIXELCAT_TEST_FOOD"] != nil { self?.putFood() }
+            if env["PIXELCAT_TEST_ADD"] != nil {
+                let before = self?.store.todos.count ?? 0
+                self?.hub.testBlankRow("First") { ok1 in
+                    self?.hub.testBlankRow("Second") { ok2 in
+                        log("blank row: added \((self?.store.todos.count ?? 0) - before), cursor back in blank row: \(ok1 && ok2), last: \(self?.store.todos.last?.text ?? "")")
+                    }
+                }
+            }
             if env["PIXELCAT_TEST_REMIND"] != nil { self?.comeAndSay("Time for: test reminder") }
             if env["PIXELCAT_TEST_DUE"] != nil {
                 log("set due via popover path: \(self?.hub.testSetDue(after: 6) ?? false)")

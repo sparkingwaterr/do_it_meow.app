@@ -1186,24 +1186,46 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
         return app.store.todos.first?.due != nil
     }
 
-    // MARK: Snapshots (모양 확인용)
+    // MARK: Screenshots
 
-    // 각 화면을 밝은 모드로 그려서 PNG 로 저장한다
-    func snapshotAll(to dir: String) {
+    // 설명서용: 모든 화면을 밝은 테마와 어두운 테마로 한 번씩 그려서 app-<화면>-<light|dark>.png 로 저장한다
+    func snapshotAll(to dir: String, then done: @escaping () -> Void) {
         show()
-        window?.appearance = NSAppearance(named: .aqua)
-        func snap(_ i: Int) {
-            guard i < pages.count else { return }
-            select(i)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
-                if let view = self?.window?.contentView, let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) {
-                    view.cacheDisplay(in: view.bounds, to: rep)
-                    try? rep.representation(using: .png, properties: [:])?
-                        .write(to: URL(fileURLWithPath: "\(dir)/page-\(i).png"))
+        let names = ["overview", "todos", "notes", "timers", "calendar", "focus", "cat", "settings"]
+        let themes: [(name: String, look: NSAppearance.Name)] = [("light", .aqua), ("dark", .darkAqua)]
+        var jobs = themes.flatMap { theme in names.indices.map { (theme, $0) } }
+
+        func next() {
+            guard !jobs.isEmpty, let window else {
+                done()
+                return
+            }
+            let (theme, page) = jobs.removeFirst()
+            guard let look = NSAppearance(named: theme.look) else { return next() }
+            window.appearance = look
+            select(page)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                defer { next() }
+                guard let view = window.contentView, let shot = view.bitmapImageRepForCachingDisplay(in: view.bounds),
+                      let out = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: shot.pixelsWide, pixelsHigh: shot.pixelsHigh,
+                                                 bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                                                 colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) else { return }
+                view.cacheDisplay(in: view.bounds, to: shot)
+                out.size = shot.size
+                // 찍힌 그림에는 창 바탕이 없으므로 그 테마의 창 바탕색을 먼저 깐다
+                NSGraphicsContext.saveGraphicsState()
+                NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: out)
+                let area = NSRect(origin: .zero, size: shot.size)
+                look.performAsCurrentDrawingAppearance {
+                    NSColor.windowBackgroundColor.setFill()
+                    area.fill()
                 }
-                snap(i + 1)
+                shot.draw(in: area, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
+                NSGraphicsContext.restoreGraphicsState()
+                try? out.representation(using: .png, properties: [:])?
+                    .write(to: URL(fileURLWithPath: "\(dir)/app-\(names[page])-\(theme.name).png"))
             }
         }
-        snap(0)
+        next()
     }
 }

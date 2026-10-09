@@ -430,6 +430,9 @@ final class CatView: NSView {
     }
 }
 
+// 설명서에 넣을 화면을 찍는 모드. 진짜 할 일과 메모 대신 보기용 예시를 쓰고, 아무것도 저장하지 않는다
+let demoMode = ProcessInfo.processInfo.environment["PIXELCAT_SCREENSHOTS"] != nil
+
 // MARK: - Todos
 
 struct Todo: Codable {
@@ -453,7 +456,18 @@ final class Store {
     }
 
     init() {
-        if let data = UserDefaults.standard.data(forKey: key),
+        if demoMode {
+            let cal = Calendar.current, today = cal.startOfDay(for: Date())
+            todos = [
+                Todo(text: "Reply to Mina's email", done: true),
+                Todo(text: "Morning stretch", done: true, today: true),
+                Todo(text: "Finish the slide deck", done: false, due: Date().addingTimeInterval(2 * 3600), today: true),
+                Todo(text: "Buy cat food", done: false, due: cal.date(byAdding: .hour, value: 33, to: today)),
+                Todo(text: "Call the dentist", done: false),
+                Todo(text: "Water the plants", done: true, today: true),
+                Todo(text: "Book train tickets", done: false, due: cal.date(byAdding: .hour, value: 4 * 24 + 18, to: today)),
+            ]
+        } else if let data = UserDefaults.standard.data(forKey: key),
            let saved = try? JSONDecoder().decode([Todo].self, from: data) {
             // 예전 버전이 넣어 둔 한국어 예시는 영어로 바꿔 준다
             let samples = [
@@ -461,7 +475,11 @@ final class Store {
                 "아래 칸에 새 할 일 적기": "Type a new to-do below",
                 "끝낸 일은 눌러서 체크": "Click an item to check it off",
             ]
-            todos = saved.map { Todo(text: samples[$0.text] ?? $0.text, done: $0.done) }
+            todos = saved.map { todo in
+                var t = todo  // 글자만 바꾸고 마감 시각, 오늘 표시 같은 나머지는 그대로 둔다
+                t.text = samples[todo.text] ?? todo.text
+                return t
+            }
         } else {
             todos = [
                 Todo(text: "Click the cat to see to-dos", done: true),
@@ -472,6 +490,7 @@ final class Store {
     }
 
     func save() {
+        if demoMode { return }
         if let data = try? JSONEncoder().encode(todos) {
             UserDefaults.standard.set(data, forKey: key)
             UserDefaults.standard.synchronize()  // 갑자기 꺼져도 남도록 바로 내려쓴다
@@ -1197,6 +1216,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         if d.object(forKey: "focusMinutes") != nil { focusMinutes = max(1, d.integer(forKey: "focusMinutes")) }
         if d.object(forKey: "breakMinutes") != nil { breakMinutes = max(1, d.integer(forKey: "breakMinutes")) }
+        if demoMode { hunger = 22 }
         hub = Hub(app: self)
         bubble.notes = hub.notesPane
         hub.notesPane.onChange = { [weak self] in
@@ -1208,7 +1228,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // 메뉴를 누른 것과 똑같은 경로로 시험해 볼 수 있게
         let env = ProcessInfo.processInfo.environment
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
-            if let dir = env["PIXELCAT_TEST_HUB"] { self?.hub.snapshotAll(to: dir) }
+            if let dir = env["PIXELCAT_SCREENSHOTS"] { self?.hub.snapshotAll(to: dir) { exit(0) } }
             if env["PIXELCAT_TEST_BALL"] != nil { self?.toggleBall() }
             if env["PIXELCAT_TEST_FOOD"] != nil { self?.putFood() }
             if env["PIXELCAT_TEST_REMIND"] != nil { self?.comeAndSay("Time for: test reminder") }
@@ -1322,6 +1342,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: Position
 
     func saveHome() {
+        if demoMode { return }
         homeY = catPanel.frame.minY
         UserDefaults.standard.set(Double(catPanel.frame.minX), forKey: "catX")
         UserDefaults.standard.set(Double(homeY), forKey: "catY")
@@ -2213,7 +2234,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if new.count >= old.count && now != was {  // 지워서 줄어든 건 세지 않는다
             var h = history
             h[dayKey(Date())] = max(0, (h[dayKey(Date())] ?? 0) + now - was)
-            UserDefaults.standard.set(h, forKey: "history")
+            if !demoMode { UserDefaults.standard.set(h, forKey: "history") }
             if now > was { celebrate() }
         }
         DispatchQueue.main.async { [weak self] in
@@ -2230,7 +2251,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     // 날짜별로 끝낸 할 일 개수
-    var history: [String: Int] { UserDefaults.standard.dictionary(forKey: "history") as? [String: Int] ?? [:] }
+    var history: [String: Int] {
+        if demoMode {  // 보기용: 지난 7일
+            let counts = [3, 5, 2, 6, 4, 7, 3]
+            return Dictionary(uniqueKeysWithValues: counts.enumerated().map {
+                (dayKey(Date().addingTimeInterval(TimeInterval(-86400 * (6 - $0.offset)))), $0.element)
+            })
+        }
+        return UserDefaults.standard.dictionary(forKey: "history") as? [String: Int] ?? [:]
+    }
     var doneToday: Int { history[dayKey(Date())] ?? 0 }
 
     // 오늘까지 하루도 빠짐없이 뭔가를 끝낸 날 수
@@ -2261,6 +2290,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: Hunger and mood
 
     func saveHunger() {
+        if demoMode { return }
         UserDefaults.standard.set(hunger, forKey: "hunger")
         UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "hungerAt")
     }

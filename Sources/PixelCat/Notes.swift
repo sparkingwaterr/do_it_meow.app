@@ -26,7 +26,15 @@ final class NotesPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NST
 
     override init() {
         super.init()
-        if let data = UserDefaults.standard.data(forKey: "notes"),
+        if demoMode {
+            notes = [
+                Note(text: "Weekend ideas\n\n- Hike the river trail\n- Try the new ramen place\n- Fix the squeaky door",
+                     updated: Date().addingTimeInterval(-900)),
+                Note(text: "Meeting notes\n\nShip the beta on Friday. Ask Jun about the icon.",
+                     updated: Date().addingTimeInterval(-86400)),
+                Note(text: "Books to read\n\nThe Left Hand of Darkness\nPiranesi", updated: Date().addingTimeInterval(-3 * 86400)),
+            ]
+        } else if let data = UserDefaults.standard.data(forKey: "notes"),
            let saved = try? JSONDecoder().decode([Note].self, from: data) {
             notes = saved.sorted { $0.updated > $1.updated }  // 최근에 고친 것이 위로
         }
@@ -36,6 +44,7 @@ final class NotesPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NST
     }
 
     private func save() {
+        if demoMode { return }
         if let data = try? JSONEncoder().encode(notes) { UserDefaults.standard.set(data, forKey: "notes") }
         UserDefaults.standard.synchronize()  // 갑자기 꺼져도 남도록 바로 내려쓴다
     }

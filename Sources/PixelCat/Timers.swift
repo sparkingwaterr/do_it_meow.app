@@ -38,7 +38,12 @@ final class TimersPane: NSObject, NSTableViewDataSource, NSTableViewDelegate {
 
     override init() {
         super.init()
-        if let data = UserDefaults.standard.data(forKey: "timers"),
+        if demoMode {
+            timers = [
+                CountdownTimer(label: "Tea", total: 180, ends: Date() + 150, remaining: 150),
+                CountdownTimer(label: "Laundry", total: 1800, ends: nil, remaining: 1125),
+            ]
+        } else if let data = UserDefaults.standard.data(forKey: "timers"),
            let saved = try? JSONDecoder().decode([CountdownTimer].self, from: data) {
             timers = saved
         }
@@ -46,8 +51,10 @@ final class TimersPane: NSObject, NSTableViewDataSource, NSTableViewDelegate {
     }
 
     private func save() {
-        if let data = try? JSONEncoder().encode(timers) { UserDefaults.standard.set(data, forKey: "timers") }
-        UserDefaults.standard.synchronize()
+        if !demoMode {
+            if let data = try? JSONEncoder().encode(timers) { UserDefaults.standard.set(data, forKey: "timers") }
+            UserDefaults.standard.synchronize()
+        }
         empty.isHidden = !timers.isEmpty
         onChange?()
     }

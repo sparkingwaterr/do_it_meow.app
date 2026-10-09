@@ -31,6 +31,7 @@ final class Updater {
 
     // Check shortly after launch and then once a day, if the user has left automatic checks on
     func start() {
+        if unattended { return check(userInitiated: false) }
         guard !demoMode else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 30) { [weak self] in self?.checkIfDue() }
         let t = Timer(timeInterval: 3600, repeats: true) { [weak self] _ in self?.checkIfDue() }

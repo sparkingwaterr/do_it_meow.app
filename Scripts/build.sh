@@ -6,7 +6,12 @@ cd "$(dirname "$0")/.."
 APP="build/PixelCat.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-swiftc -O Sources/PixelCat/*.swift -o "$APP/Contents/MacOS/PixelCat"
+# Universal binary so it runs on both Apple silicon and Intel Macs
+TMP="$(mktemp -d)"
+for arch in arm64 x86_64; do
+    swiftc -O -target "$arch-apple-macos13.0" Sources/PixelCat/*.swift -o "$TMP/PixelCat-$arch"
+done
+lipo -create "$TMP/PixelCat-arm64" "$TMP/PixelCat-x86_64" -output "$APP/Contents/MacOS/PixelCat"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 
 # App icon: the app draws its own picture, which is scaled to each size and bundled

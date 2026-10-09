@@ -1230,6 +1230,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     }
                 }
             }
+            if env["PIXELCAT_TEST_PEEK"] != nil {  // climb a window, open the bubble, and see whether the cat keeps hanging
+                self?.climbWindow()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 8) {
+                    let before = self?.catView.inPeek ?? false
+                    log("peek state: perch \(self?.perch != nil) motion \(self?.motion != nil) sink \(self?.catView.sink ?? -1) target \(self?.catView.sinkTarget ?? -1) food \(self?.hasFood ?? false) away \(self?.away ?? false) jumping \(self?.jumping ?? false)")
+                    log("bubble visible before toggle: \(self?.bubblePanel.isVisible ?? false)")
+                    self?.toggleBubble()
+                    log("right after toggle: \(self?.bubblePanel.isVisible ?? false) frame \(self?.bubblePanel.frame ?? .zero)")
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                        log("peek test: hanging before \(before), bubble open \(self?.bubblePanel.isVisible ?? false), still hanging \(self?.catView.inPeek ?? false)")
+                    }
+                }
+            }
             if env["PIXELCAT_TEST_REMIND"] != nil { self?.comeAndSay("Time for: test reminder") }
             if env["PIXELCAT_TEST_DUE"] != nil {
                 log("set due via popover path: \(self?.hub.testSetDue(after: 6) ?? false)")
@@ -1299,6 +1312,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if bubblePanel.isVisible {
             guard force else { return }
             bubblePanel.orderOut(nil)
+            log("bubble closed to say: \(text)")
         }
         sitUpUntil = max(sitUpUntil, Date() + seconds + 0.2)
         quip.showsHeart = false
@@ -1370,8 +1384,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             catView.sinkTarget = 0
             return
         }
-        // On a window the default is to peek. The cat only rises when touched, talking or running
-        let hiding = (motion == nil || creeping) && !bubblePanel.isVisible && !hasFood && Date() > sitUpUntil
+        // On a window the default is to peek. The cat only rises when talking, eating or running.
+        // Clicking it opens the bubble while it keeps hanging
+        let hiding = (motion == nil || creeping) && !hasFood && Date() > sitUpUntil
         catView.sinkTarget = hiding ? catView.hideDepth : 0
         let wins = visibleWindows()
         guard let i = wins.firstIndex(where: { $0.id == p.id }) else {

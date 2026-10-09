@@ -134,7 +134,17 @@ How much is done, your streak, the last 7 days, the cat's mood, and what is comi
 
 ## Install
 
-Requires macOS 13 or later and the Xcode command line tools (`xcode-select --install`).
+### Download
+
+1. Get `PixelCat-<version>.zip` from the [latest release](https://github.com/sparkingwaterr/do_it_meow.app/releases/latest) and unzip it.
+2. Move `PixelCat.app` to your Applications folder.
+3. The app is not notarized by Apple, so the first launch is blocked. Open **System Settings → Privacy & Security**, scroll down, and press **Open Anyway**. On older macOS versions, right-click the app and choose **Open** instead.
+
+Requires macOS 13 or later. Runs on Apple silicon and Intel Macs.
+
+### Build from source
+
+Requires the Xcode command line tools (`xcode-select --install`).
 
 ```bash
 git clone https://github.com/sparkingwaterr/do_it_meow.app.git
@@ -153,6 +163,7 @@ Everything stays on your Mac. To-dos, notes, timers, and settings are saved in t
 ```bash
 make run          # build into build/ and launch
 make screenshots  # retake the README screenshots in light and dark with sample data
+make release      # zip the app into build/ for a GitHub release
 make clean        # delete build/
 ```
 

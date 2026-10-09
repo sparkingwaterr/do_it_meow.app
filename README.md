@@ -2,6 +2,10 @@
 
 **A pixel cat that lives on your Mac desktop and keeps your to-dos.** Finish a task and it gets fed.
 
+[![Latest release](https://img.shields.io/github/v/release/sparkingwaterr/do_it_meow.app?label=latest)](https://github.com/sparkingwaterr/do_it_meow.app/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/sparkingwaterr/do_it_meow.app/total?label=downloads)](https://github.com/sparkingwaterr/do_it_meow.app/releases)
+[![Visitors](https://hits.sh/github.com/sparkingwaterr/do_it_meow.app.svg?label=visitors)](https://hits.sh/github.com/sparkingwaterr/do_it_meow.app/)
+
 <p align="center">
   <img src="docs/screenshots/cat-loaf.png" width="150" alt="The cat sitting like a loaf">
   &nbsp;&nbsp;

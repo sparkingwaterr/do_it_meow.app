@@ -188,17 +188,18 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
         updateStatusTitle()
     }
 
-    // 메뉴 막대 아이콘: 작은 고양이를 선으로만 그린 그림. 테두리, 무늬, 눈, 코만 칠하고 흰 털은 비워 두어서
+    // 메뉴 막대 아이콘: 귀가 쫑긋한 고양이 얼굴을 한 색으로 칠하고 눈과 코만 뚫어 놓았다.
     // 밝은 메뉴 막대에서는 검게, 어두운 메뉴 막대에서는 희게 저절로 바뀐다
     static let menuBarCat = [
-        ".KK...KK.....",
-        "KBBK.KWWK....",
-        "KBBBKWWWKKK..",
-        "KBBWWWWWWBWK.",
-        "KWWEWWWEWBBWK",
-        "KWWeWPWeWWWWK",
-        "KWWWWWWWWWBBK",
-        ".KKKKKKKKKKK.",
+        ".K.......K.",
+        "KKK.....KKK",
+        "KKKKKKKKKKK",
+        "KKKKKKKKKKK",
+        "KK.KKKKK.KK",
+        "KK.KKKKK.KK",
+        "KKKKK.KKKKK",
+        "KKKKKKKKKKK",
+        ".KKKKKKKKK.",
     ]
 
     static func menuBarIcon() -> NSImage {
@@ -207,7 +208,7 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
         let image = NSImage(size: size, flipped: true) { _ in
             NSColor.black.setFill()
             for (y, row) in menuBarCat.enumerated() {
-                for (x, ch) in row.enumerated() where ch != "." && ch != "W" {
+                for (x, ch) in row.enumerated() where ch == "K" {
                     NSRect(x: CGFloat(x) * unit, y: CGFloat(y) * unit, width: unit, height: unit).fill()
                 }
             }

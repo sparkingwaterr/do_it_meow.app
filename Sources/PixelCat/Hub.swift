@@ -155,6 +155,8 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
     var loginNote = ""
     let notesPane = NotesPane()
     let timersPane = TimersPane()
+    let catPreview = CatView(frame: .zero)
+    var previewTimer: Timer?
     // 달력에는 마감 시간이 있는 할 일을 올린다
     lazy var calendarPane = CalendarPane { [unowned self] in
         self.app.store.todos.compactMap { t in t.due.map { CalendarItem(date: $0, title: t.text, done: t.done) } }
@@ -192,12 +194,14 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
         NSApp.setActivationPolicy(.regular)  // 창이 떠 있는 동안은 Dock 과 메뉴 막대에 나오는 보통 앱
         NSApp.activate(ignoringOtherApps: true)
         window?.makeKeyAndOrderFront(nil)
+        animatePreview(true)
         reloadTodos()
         refresh()
     }
 
     func windowWillClose(_ notification: Notification) {
         guard (notification.object as? NSWindow) === window else { return }
+        animatePreview(false)
         NSApp.setActivationPolicy(.accessory)  // 창을 닫으면 다시 고양이만 남는다
     }
 
@@ -368,6 +372,33 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
         ], spacing: 6)
     }
 
+    // 지금 자세를 그대로 따라 하는 큰 고양이와, 그 옆의 기분
+    private func catNow() -> NSView {
+        catPreview.isPreview = true
+        catPreview.px = 6
+        let size = catPreview.spriteSize
+        _ = fixed(catPreview, width: size.width, height: size.height)
+        let stage = vstack([catPreview, keyed("cp.activity", label("", size: 12, weight: .semibold))], spacing: 6)
+        stage.alignment = .centerX
+        let row = hstack([stage, moodBlock("cp")], spacing: 22)
+        row.alignment = .centerY
+        return row
+    }
+
+    // 창이 떠 있는 동안 미리보기를 초당 열 번 고친다
+    private func animatePreview(_ on: Bool) {
+        previewTimer?.invalidate()
+        previewTimer = nil
+        guard on else { return }
+        let t = Timer(timeInterval: 0.1, repeats: true) { [weak self] _ in
+            guard let self, self.current == 6, self.window?.isVisible == true else { return }
+            self.catPreview.mirror(self.app.catView)
+            self.set("cp.activity", self.app.activity)
+        }
+        RunLoop.main.add(t, forMode: .common)
+        previewTimer = t
+    }
+
     // MARK: Pages
 
     private func buildOverview() -> NSView {
@@ -510,10 +541,11 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
                                       target: self, action: #selector(sizeChanged(_:)))
         return vstack([
             heading("Cat"),
-            CardView(moodBlock("cp")),
+            CardView(catNow()),
             caption("Appearance"),
             hstack([fixed(label("Look"), width: 60), keyed("cp.look", look)]),
             hstack([fixed(label("Size"), width: 60), keyed("cp.size", size)]),
+            keyed("cp.kitten", check("A kitten follows the cat around", #selector(AppDelegate.toggleKitten))),
             caption("Play"),
             hstack([button("Put Out Food", #selector(AppDelegate.putFood)),
                     keyed("cp.ball", button("Throw Yarn Ball", #selector(AppDelegate.toggleBall))),
@@ -653,6 +685,7 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
         (controls["ov.ball"] as? NSButton)?.title = ballTitle
         (controls["cp.ball"] as? NSButton)?.title = ballTitle
         (controls["cp.sleep"] as? NSButton)?.title = app.asleep ? "Wake Up" : "Put to Sleep"
+        (controls["cp.kitten"] as? NSButton)?.state = app.kitten?.enabled == true ? .on : .off
         (controls["cp.climb"] as? NSButton)?.isEnabled = app.perch == nil
         (controls["cp.down"] as? NSButton)?.isEnabled = app.perch != nil
         let bubbleTitle = app.bubblePanel.isVisible ? "Hide on Cat" : "Show on Cat"

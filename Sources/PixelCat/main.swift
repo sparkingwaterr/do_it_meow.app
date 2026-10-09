@@ -172,6 +172,26 @@ final class CatView: NSView {
     var running = false { didSet { needsDisplay = true } }  // true 면 다리를 내고 뜀
     var dip = 0 { didSet { needsDisplay = true } }  // 밥 먹을 때 몸을 숙이는 칸 수
     var asleep = false { didSet { needsDisplay = true } }
+    var isPreview = false  // 보여 주기만 하는 고양이 (앱 창의 미리보기, 새끼 고양이). 마우스에 반응하지 않는다
+
+    override func hitTest(_ point: NSPoint) -> NSView? { isPreview ? nil : super.hitTest(point) }
+
+    // 다른 고양이의 지금 자세를 그대로 베낀다
+    func mirror(_ other: CatView) {
+        design = other.design
+        blink = other.blink
+        wag = other.wag
+        happy = other.happy
+        asleep = other.asleep
+        snot = other.snot
+        walkFrame = other.walkFrame
+        running = other.running
+        facingRight = other.facingRight
+        jump = other.jump
+        dip = other.dip
+        sink = other.sink
+    }
+
     var snot = 0 { didSet { needsDisplay = true } }  // 콧방울 크기 0~3
 
     // 발밑 선 아래로 가라앉은 칸 수. 가라앉은 부분은 그리지 않아서 창 뒤에 숨은 것처럼 보인다.
@@ -251,6 +271,7 @@ final class CatView: NSView {
 
     override func updateTrackingAreas() {
         trackingAreas.forEach(removeTrackingArea)
+        if isPreview { return }
         addTrackingArea(NSTrackingArea(rect: bodyRect, options: [.mouseEnteredAndExited, .mouseMoved, .activeAlways],
                                        owner: self, userInfo: nil))
     }
@@ -1061,6 +1082,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // 공놀이나 알림 때문에 바닥 줄을 떠나 화면 어딘가에 떠 있는 상태. 이때 있는 곳을 바닥으로 저장하면 안 된다
     var away = false
     var ringing = false
+    var jumping = false
+    var kitten: Kitten!
     var ringTimer: Timer?
     var ringToken = 0
     var awayUntil = Date.distantPast  // 이 시각까지는 떠 있는 채로 둔다 (말하는 중)
@@ -1176,6 +1199,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if d.object(forKey: "focusMinutes") != nil { focusMinutes = max(1, d.integer(forKey: "focusMinutes")) }
         if d.object(forKey: "breakMinutes") != nil { breakMinutes = max(1, d.integer(forKey: "breakMinutes")) }
         hub = Hub(app: self)
+        kitten = Kitten(app: self)
+        kitten.setEnabled(d.object(forKey: "kitten") == nil || d.bool(forKey: "kitten"))
         bubble.notes = hub.notesPane
         hub.notesPane.onChange = { [weak self] in
             guard let self, self.bubblePanel.isVisible, self.bubble.showsNotes else { return }
@@ -1388,6 +1413,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         catView.dip = 0
         catView.wag = false
         creeping = false
+        jumping = false
         if eating {
             eating = false
             catView.happy = false
@@ -1452,6 +1478,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         catView.facingRight = target.x > start.x
         catView.running = true
         catView.walkFrame = 1
+        jumping = true
         var n = 0
         let t = Timer(timeInterval: 0.03, repeats: true) { [weak self] _ in
             guard let self else { return }
@@ -2036,6 +2063,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(withTitle: ballPanel.isVisible ? "Put Away Yarn Ball" : "Throw Yarn Ball",
                      action: #selector(toggleBall), keyEquivalent: "").target = self
         menu.addItem(withTitle: asleep ? "Wake Up" : "Put to Sleep", action: #selector(toggleSleep), keyEquivalent: "").target = self
+        let kit = menu.addItem(withTitle: "Kitten", action: #selector(toggleKitten), keyEquivalent: "")
+        kit.target = self
+        kit.state = kitten.enabled ? .on : .off
         let wander = menu.addItem(withTitle: "Wander Around", action: #selector(toggleWander), keyEquivalent: "")
         wander.target = self
         wander.state = wanderOn ? .on : .off
@@ -2165,6 +2195,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func toggleTodoBubble() {
         toggleBubble()
         hub.refresh()
+    }
+
+    @objc func toggleKitten() {
+        kitten.setEnabled(!kitten.enabled)
+        UserDefaults.standard.set(kitten.enabled, forKey: "kitten")
+        hub.refresh()
+    }
+
+    // 고양이가 지금 뭘 하고 있는지 한마디로
+    var activity: String {
+        if ringing { return "Ringing for you" }
+        if eating { return "Eating" }
+        if playing { return "Chasing the yarn ball" }
+        if asleep { return perch != nil ? "Sleeping on a window" : "Sleeping" }
+        if jumping { return "Jumping" }
+        if motion != nil { return catView.running ? "Running" : "Walking" }
+        if catView.inPeek { return "Peeking over a window" }
+        if perch != nil { return "Sitting on a window" }
+        if catView.happy { return "Enjoying the attention" }
+        return "Sitting"
     }
 
     // MARK: To-dos
@@ -2485,7 +2535,7 @@ if let i = args.firstIndex(of: "--icon"), i + 1 < args.count {
 if let i = args.firstIndex(of: "--render"), i + 1 < args.count {
     // 창을 띄우지 않고 그림만 PNG로 저장 (모양 확인용)
     let dir = args[i + 1]
-    for (n, design) in designs.enumerated() {
+    for (n, design) in (designs + [kittenDesign]).enumerated() {
         let cat = CatView(frame: .zero)
         cat.design = design
         cat.px = 12

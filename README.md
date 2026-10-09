@@ -35,6 +35,7 @@ make clean   # delete build/
 | `Sources/PixelCat/Hub.swift` | The app window, menu bar, status item, quick add |
 | `Sources/PixelCat/Notes.swift` | Notes |
 | `Sources/PixelCat/Timers.swift` | Countdown timers |
+| `Sources/PixelCat/Kitten.swift` | The kitten that follows the cat |
 | `Sources/PixelCat/Calendar.swift` | Month calendar of to-do reminders |
 | `Resources/Info.plist` | App bundle metadata |
 | `Scripts/build.sh` | Builds `build/PixelCat.app` with its icon |

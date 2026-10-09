@@ -188,18 +188,18 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
         updateStatusTitle()
     }
 
-    // 메뉴 막대 아이콘: 가는 선으로 그린 작은 고양이 얼굴. 귀, 눈 두 개, 코만 있다.
+    // 메뉴 막대 아이콘: 가는 선으로 그린 작은 고양이 얼굴. 귀, 눈 두 개, 코, 양옆으로 뻗은 수염.
     // 밝은 메뉴 막대에서는 검게, 어두운 메뉴 막대에서는 희게 저절로 바뀐다
     static let menuBarCat = [
-        "K.......K",
-        "KK.....KK",
-        "K.KKKKK.K",
-        "K.......K",
-        "K.K...K.K",
-        "K.......K",
-        "K...K...K",
-        "K.......K",
-        ".KKKKKKK.",
+        "..K.......K..",
+        "..KK.....KK..",
+        "..K.KKKKK.K..",
+        "..K.......K..",
+        "..K.K...K.K..",
+        "KKK.......KKK",
+        "..K...K...K..",
+        "KKK.......KKK",
+        "...KKKKKKK...",
     ]
 
     static func menuBarIcon() -> NSImage {

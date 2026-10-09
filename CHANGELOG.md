@@ -3,6 +3,7 @@
 ## Unreleased
 
 - **Stay on top of windows.** A setting that keeps the cat on window tops and off the rest of the screen. Reminders and timers then show as a speech bubble where the cat is instead of sending it running to your cursor.
+  Throwing the yarn ball switches the setting off, since play ranges over the whole screen.
 - Speech bubbles appear below the cat when it sits at the very top of the screen.
 
 ## 2.1.0

@@ -1739,6 +1739,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // The ball rolls freely around the screen and bounces off the edges. The cat chases it anywhere and bats it away,
     // and once it has had enough it goes back to the height it came from
     func startPlay() {
+        // Ball play ranges over the whole screen, so it switches stay-on-windows mode off
+        if stayOnWindows {
+            stayOnWindows = false
+            UserDefaults.standard.set(false, forKey: "stayOnWindows")
+            hub.refresh()
+        }
         wake()
         if eating { cancelMotion() }
         if catView.inPeek {

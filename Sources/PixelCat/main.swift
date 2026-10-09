@@ -18,7 +18,7 @@ let colors: [Character: NSColor] = [
     "Y": NSColor(srgbRed: 1.00, green: 0.88, blue: 0.48, alpha: 1),
 ]
 
-// 잘 때 쓰는 수면 모자. 끝이 오른쪽으로 늘어지고 방울이 달려 있다
+// The nightcap worn while asleep. The tip droops to the right and ends in a pom-pom
 let nightcap = [
     "....KKKK......",
     "...KNNNNKK....",
@@ -29,31 +29,31 @@ let nightcap = [
 let snotBlue = NSColor(srgbRed: 0.45, green: 0.76, blue: 1.0, alpha: 1)
 let snotShine = NSColor(srgbRed: 0.86, green: 0.95, blue: 1.0, alpha: 1)
 
-// E/e 는 눈 (E는 깜빡일 때 lid 색으로 덮임), c 는 기분 좋을 때만 보이는 볼터치,
-// wag 는 꼬리 흔들 때 바뀌는 줄
+// E/e are the eyes (E is covered with the `lid` colour when blinking), c is blush that only shows when happy,
+// and `wag` holds the rows that change when the tail wags
 struct Design {
     let name: String
     let rows: [String]
     let wag: [Int: String]
     let eye: NSColor
     let lid: Character
-    // 뛰는 동작 (쭉 뻗기 → 앞발 착지 → 모으기 → 뒷발로 차기). 각 장은 [몸 맨 아랫줄을 대신할 줄, 그 아래 다리 줄들...]
-    // 천천히 걸을 때는 다리 없이 몸만 들썩이고, legs 가 없는 고양이는 뛸 때도 그렇게 움직인다
+    // Running frames (stretch → front paws land → gather → push off). Each frame is [row replacing the body's bottom row, leg rows below it...]
+    // A slow walk shows no legs, the body just bobs; a cat with no `legs` moves that way when running too
     var legs: [[String]] = []
-    var peek = 7  // peekRows 가 없을 때: 창 뒤로 가라앉는 칸 수 (눈까지만 보이게)
-    // 창 뒤에서 양팔을 걸치고 내다보는 그림. 마지막 pawOverhang 줄은 창 모서리 아래로 걸쳐지는 앞발
+    var peek = 7  // Without peekRows: how many rows sink behind the window (so only the eyes and up show)
+    // The sprite for hanging on a window with both paws. The last `pawOverhang` rows are the paws that drape over the edge
     var peekRows: [String] = []
-    // 코 위치 (칸, 줄). 잘 때 여기서 콧방울이 나온다
+    // Nose position (column, row). The sleep bubble comes out here
     var nose = (x: 5, y: 5)
     var peekNose = (x: 9, y: 5)
-    // 수면 모자의 왼쪽 위 모서리 위치 (칸, 줄). 머리 위로 올라가므로 줄은 음수
+    // Top-left corner of the nightcap (column, row). Rows are negative because it sits above the head
     var cap = (x: 0, y: -3)
     var peekCap = (x: 3, y: -3)
 }
 let pawOverhang = 2
 
-// 세 마리 모두 같은 식빵 체형이고 무늬만 다르다. 뛰는 다리는 같이 쓴다
-// 짧고 뭉툭한 발. 벌렸다 모았다 하면서 종종거린다
+// All three cats share the loaf body and differ only in markings. They share the running legs too
+// Short, stubby paws that spread and gather as the cat scurries
 let loafLegs = [
     ["..WWKKKKKKKKKKWWK.",
      ".KWWK........KWWK.",
@@ -156,10 +156,10 @@ final class CatView: NSView {
     var px: CGFloat = 3 { didSet { needsDisplay = true } }
     var blink = false { didSet { needsDisplay = true } }
     var wag = false { didSet { needsDisplay = true } }
-    var jump = 0 { didSet { needsDisplay = true } }  // 바닥에서 떠 있는 높이 (픽셀 칸 수)
+    var jump = 0 { didSet { needsDisplay = true } }  // Height off the floor, in sprite pixels
     var happy = false { didSet { needsDisplay = true } }
 
-    static let headroom = 6  // 뛰어오를 자리로 비워두는 위쪽 칸 수
+    static let headroom = 6  // Empty rows kept above the cat as room to jump
     var spriteSize: NSSize {
         NSSize(width: CGFloat(design.rows[0].count) * px,
                height: CGFloat(design.rows.count + Self.headroom) * px)
@@ -168,15 +168,15 @@ final class CatView: NSView {
         NSRect(x: 0, y: CGFloat(Self.headroom) * px, width: bounds.width, height: CGFloat(design.rows.count) * px)
     }
 
-    var walkFrame = 0 { didSet { needsDisplay = true } }  // 0 = 안 걷는 중, 1/2 = 걷는 동작
-    var running = false { didSet { needsDisplay = true } }  // true 면 다리를 내고 뜀
-    var dip = 0 { didSet { needsDisplay = true } }  // 밥 먹을 때 몸을 숙이는 칸 수
+    var walkFrame = 0 { didSet { needsDisplay = true } }  // 0 = not walking, 1 and up = walking frames
+    var running = false { didSet { needsDisplay = true } }  // true shows legs and runs
+    var dip = 0 { didSet { needsDisplay = true } }  // Rows the body ducks while eating
     var asleep = false { didSet { needsDisplay = true } }
-    var isPreview = false  // 보여 주기만 하는 고양이 (앱 창의 미리보기). 마우스에 반응하지 않는다
+    var isPreview = false  // A display-only cat (the preview in the app window). It ignores the mouse
 
     override func hitTest(_ point: NSPoint) -> NSView? { isPreview ? nil : super.hitTest(point) }
 
-    // 다른 고양이의 지금 자세를 그대로 베낀다
+    // Copy another cat's current pose exactly
     func mirror(_ other: CatView) {
         design = other.design
         blink = other.blink
@@ -192,10 +192,10 @@ final class CatView: NSView {
         sink = other.sink
     }
 
-    var snot = 0 { didSet { needsDisplay = true } }  // 콧방울 크기 0~3
+    var snot = 0 { didSet { needsDisplay = true } }  // Nose bubble size, 0 to 3
 
-    // 발밑 선 아래로 가라앉은 칸 수. 가라앉은 부분은 그리지 않아서 창 뒤에 숨은 것처럼 보인다.
-    // peekRows 가 있으면 몸이 다 가라앉은 뒤(sink > 줄 수) 머리가 다시 올라와 앞발을 걸친다
+    // Rows sunk below the floor line. The sunk part is not drawn, so the cat looks hidden behind the window.
+    // With peekRows, once the body has sunk completely (sink > row count) the head rises again and the paws hook over the edge
     private(set) var sink = 0 { didSet { needsDisplay = true } }
     var sinkTarget = 0 { didSet { if sinkTarget != sink { animateSink() } } }
     var sinkTimer: Timer?
@@ -222,10 +222,10 @@ final class CatView: NSView {
         RunLoop.main.add(t, forMode: .common)
         sinkTimer = t
     }
-    var facingRight = false { didSet { needsDisplay = true } }  // 그림은 왼쪽을 보고 있고, true 면 좌우로 뒤집음
+    var facingRight = false { didSet { needsDisplay = true } }  // The sprite faces left; true flips it
     var isBusy: Bool { (hovering && mouseOver) || pressed || timer != nil }
 
-    // 고양이가 스스로 움직여서 마우스 밑을 벗어나면 mouseExited 가 안 오므로 실제 위치로 다시 확인한다
+    // When the cat walks out from under the mouse no mouseExited arrives, so check the real position
     var mouseOver: Bool {
         guard let window else { return false }
         return bodyRect.contains(convert(window.convertPoint(fromScreen: NSEvent.mouseLocation), from: nil))
@@ -237,7 +237,7 @@ final class CatView: NSView {
     var tick = 0
     var timer: Timer?
 
-    // 제자리 점프는 하지 않는다. 넘겨받은 길이만큼 기뻐하는 표정만 유지
+    // No jumping in place. Just hold the happy face for as many frames as were passed in
     func hop(_ frames: [Int]) {
         jumpFrames = Array(repeating: 0, count: frames.count)
         startAnimating()
@@ -277,7 +277,7 @@ final class CatView: NSView {
     }
 
     override func mouseEntered(with event: NSEvent) {
-        if asleep { return }  // 자는 동안은 마우스를 올려도 모른다. 클릭해야 깬다
+        if asleep { return }  // Hovering does nothing while asleep. It takes a click to wake
         hovering = true
         hop([1, 2, 3, 3, 2, 1, 0])
     }
@@ -287,7 +287,7 @@ final class CatView: NSView {
         petAmount = 0
     }
 
-    // 버튼을 누르지 않고 몸 위에서 마우스를 문지르면 쓰다듬는 것으로 친다
+    // Rubbing the mouse over the body without pressing a button counts as petting
     override func mouseMoved(with event: NSEvent) {
         guard !asleep, !pressed else { return }
         petAmount += hypot(event.deltaX, event.deltaY)
@@ -296,8 +296,8 @@ final class CatView: NSView {
             onPet?()
         }
     }
-    var onClick: ((Int) -> Void)?  // 연속으로 누른 횟수
-    var onPet: (() -> Void)?       // 마우스로 쓰다듬었을 때
+    var onClick: ((Int) -> Void)?  // Number of clicks in a row
+    var onPet: (() -> Void)?       // When petted with the mouse
     var petAmount: CGFloat = 0
     var onMove: (() -> Void)?
     var menuProvider: (() -> NSMenu)?
@@ -312,7 +312,7 @@ final class CatView: NSView {
     override func draw(_ dirtyRect: NSRect) {
         let cols = design.rows[0].count
         let last = design.rows.count - 1
-        // 앞쪽 다리 뒤로, 반 박자 어긋난 건너편 다리를 회색으로 겹쳐서 입체감을 준다
+        // Behind the near legs, overlay the far legs half a beat out of step in grey, for depth
         let legs: [String]? = {
             guard running, walkFrame > 0, !design.legs.isEmpty else { return nil }
             let n = design.legs.count
@@ -320,7 +320,7 @@ final class CatView: NSView {
             return zip(near, far).enumerated().map { i, pair in
                 String(zip(pair.0, pair.1).map { a, b -> Character in
                     let shade: Character = b == "W" ? "S" : b
-                    if i == 0 { return a == "W" || shade != "S" ? a : shade }  // 몸 아랫줄: 다리가 붙는 자리만 튼다
+                    if i == 0 { return a == "W" || shade != "S" ? a : shade }  // Body's bottom row: open it only where a leg attaches
                     return a != "." ? a : shade
                 })
             }
@@ -344,13 +344,13 @@ final class CatView: NSView {
             }
         }
 
-        // 코에서 왼쪽 아래로 매달린 콧방울. rowOffset 은 그림의 0번 줄이 그려지는 줄
+        // The nose bubble hanging down-left from the nose. rowOffset is the row where sprite row 0 is drawn
         func drawSnot(_ nose: (x: Int, y: Int), _ rowOffset: Int) {
             guard asleep, snot > 0 else { return }
-            let n = [0, 1, 2, 4][min(snot, 3)]  // 한 변의 칸 수
+            let n = [0, 1, 2, 4][min(snot, 3)]  // Cells per side
             for dy in 0..<n {
                 for dx in 0..<n {
-                    if n == 4 && (dx == 0 || dx == 3) && (dy == 0 || dy == 3) { continue }  // 모서리를 깎아 둥글게
+                    if n == 4 && (dx == 0 || dx == 3) && (dy == 0 || dy == 3) { continue }  // Trim the corners to make it round
                     let x = nose.x - 1 - dx, y = nose.y + 1 + dy + rowOffset
                     guard y <= last, x >= 0 else { continue }
                     (n > 1 && dx == n - 2 && dy == (n == 4 ? 1 : 0) ? snotShine : snotBlue).setFill()
@@ -368,7 +368,7 @@ final class CatView: NSView {
         }
 
         if inPeek {
-            // 화면 맨 아래 pawOverhang 줄이 창 모서리 아래. 머리는 모서리 뒤에서 올라오고 앞발은 다 올라온 뒤에 걸친다
+            // The bottom `pawOverhang` rows are below the window edge. The head rises from behind the edge and the paws hook on once it is fully up
             let edge = last - pawOverhang
             let risen = sink - design.rows.count
             for (j, row) in design.peekRows.enumerated() {
@@ -430,7 +430,7 @@ final class CatView: NSView {
     }
 }
 
-// 설명서에 넣을 화면을 찍는 모드. 진짜 할 일과 메모 대신 보기용 예시를 쓰고, 아무것도 저장하지 않는다
+// Mode for taking the README screenshots: sample to-dos and notes replace the real ones, and nothing is saved
 let demoMode = ProcessInfo.processInfo.environment["PIXELCAT_SCREENSHOTS"] != nil
     || ProcessInfo.processInfo.environment["PIXELCAT_DEMO"] != nil
 
@@ -439,9 +439,9 @@ let demoMode = ProcessInfo.processInfo.environment["PIXELCAT_SCREENSHOTS"] != ni
 struct Todo: Codable {
     var text: String
     var done: Bool
-    var due: Date?        // 알림 시각
-    var today: Bool?      // "오늘 할 일"로 골라 둔 것
-    var notified: Bool?   // 알림을 이미 보냈는지
+    var due: Date?        // Reminder time
+    var today: Bool?      // Marked as a to-do for today
+    var notified: Bool?   // Whether the reminder has already fired
 
     var isToday: Bool { today ?? false }
 }
@@ -470,17 +470,7 @@ final class Store {
             ]
         } else if let data = UserDefaults.standard.data(forKey: key),
            let saved = try? JSONDecoder().decode([Todo].self, from: data) {
-            // 예전 버전이 넣어 둔 한국어 예시는 영어로 바꿔 준다
-            let samples = [
-                "고양이 눌러서 할 일 보기": "Click the cat to see to-dos",
-                "아래 칸에 새 할 일 적기": "Type a new to-do below",
-                "끝낸 일은 눌러서 체크": "Click an item to check it off",
-            ]
-            todos = saved.map { todo in
-                var t = todo  // 글자만 바꾸고 마감 시각, 오늘 표시 같은 나머지는 그대로 둔다
-                t.text = samples[todo.text] ?? todo.text
-                return t
-            }
+            todos = saved
         } else {
             todos = [
                 Todo(text: "Click the cat to see to-dos", done: true),
@@ -494,7 +484,7 @@ final class Store {
         if demoMode { return }
         if let data = try? JSONEncoder().encode(todos) {
             UserDefaults.standard.set(data, forKey: key)
-            UserDefaults.standard.synchronize()  // 갑자기 꺼져도 남도록 바로 내려쓴다
+            UserDefaults.standard.synchronize()  // Write to disk right away so nothing is lost if the app dies
         }
     }
 }
@@ -504,7 +494,7 @@ final class Store {
 let ringPink = NSColor(srgbRed: 0.96, green: 0.50, blue: 0.62, alpha: 1)
 let ringGreen = NSColor(srgbRed: 0.36, green: 0.78, blue: 0.52, alpha: 1)
 
-// 완료율 고리. 회색 바탕 고리 위에, 맨 위에서 시계 방향으로 완료한 만큼만 색을 칠한다
+// Completion ring. Over a grey track, colour in the finished share clockwise from the top
 func drawRing(center: NSPoint, radius: CGFloat, width: CGFloat, fraction: CGFloat, flipped: Bool,
               color: NSColor? = nil) {
     let track = NSBezierPath()
@@ -523,7 +513,7 @@ func drawRing(center: NSPoint, radius: CGFloat, width: CGFloat, fraction: CGFloa
     arc.stroke()
 }
 
-// 가운데에 큰 글자와 작은 글자가 들어가는 진행률 고리
+// A progress ring with large and small text in the middle
 final class RingView: NSView {
     var fraction: CGFloat = 0 { didSet { needsDisplay = true } }
     var big = "" { didSet { needsDisplay = true } }
@@ -555,7 +545,7 @@ final class FlippedView: NSView {
     override var isFlipped: Bool { true }
 }
 
-// 모서리가 한 칸씩 깎인 테두리 + 계단 모양 꼬리 (뒤집힌 좌표계 기준)
+// A border with one-pixel notched corners plus a stepped tail (flipped coordinates)
 func drawPixelBubble(body: NSRect, tailX: CGFloat, tailOnTop: Bool) {
     let u = BubbleView.u
     ink.setFill()
@@ -579,13 +569,13 @@ func drawPixelBubble(body: NSRect, tailX: CGFloat, tailOnTop: Bool) {
     NSRect(x: tailX + u, y: tailOnTop ? body.minY : body.maxY - u, width: u * 2, height: u).fill()
 }
 
-// 고양이가 한마디 할 때 뜨는 작은 말풍선
+// The small speech bubble for the cat's remarks
 final class QuipView: NSView {
     static let font = NSFont.systemFont(ofSize: 12, weight: .heavy)
     static let heart = [".PP.PP.", "PPPPPPP", "PPPPPPP", ".PPPPP.", "..PPP..", "...P..."]
     static let heartPx: CGFloat = 2
     var text = "" { didSet { needsDisplay = true } }
-    var showsHeart = false { didSet { needsDisplay = true } }  // 글자 대신 분홍 하트
+    var showsHeart = false { didSet { needsDisplay = true } }  // A pink heart instead of text
 
     override var isFlipped: Bool { true }
 
@@ -686,7 +676,7 @@ final class BubbleView: NSView, NSTextViewDelegate {
     var tailOnTop = false
     var onChange: (() -> Void)?
 
-    // 위쪽 탭으로 할 일과 메모를 오간다
+    // The tabs at the top switch between to-dos and memos
     var showsNotes = UserDefaults.standard.bool(forKey: "bubbleNotes")
     var noteIndex = 0
     private var shownNote: UUID?
@@ -696,10 +686,10 @@ final class BubbleView: NSView, NSTextViewDelegate {
     private let nextNote = NSButton(title: "›", target: nil, action: nil)
     private let addNote = NSButton(title: "+", target: nil, action: nil)
     private let deleteNote = NSButton(title: "×", target: nil, action: nil)
-    private var confirmDeleteUntil = Date.distantPast  // 이 시각 전에 × 를 한 번 더 누르면 지운다
+    private var confirmDeleteUntil = Date.distantPast  // Pressing × again before this time deletes the memo
     private let noteScroll = NSTextView.scrollableTextView()
     private var noteText: NSTextView { noteScroll.documentView as! NSTextView }
-    private var dynamic: [NSView] = []  // 다시 그릴 때마다 새로 만드는 것들 (제목, 할 일 줄)
+    private var dynamic: [NSView] = []  // Views rebuilt on every redraw (the heading and the to-do rows)
 
     override var isFlipped: Bool { true }
 
@@ -770,7 +760,7 @@ final class BubbleView: NSView, NSTextViewDelegate {
         setFrameSize(neededSize)
         let inner = Self.width - Self.pad * 2
 
-        // 탭: 고른 쪽은 진하게, 아닌 쪽은 흐리게
+        // Tabs: the selected one is dark, the other faded
         for (tab, name, active, x) in [(todoTab, "To-Do", !showsNotes, Self.pad), (memoTab, "Memo", showsNotes, Self.pad + 64)] {
             tab.attributedTitle = NSAttributedString(string: name, attributes: [
                 .font: NSFont.systemFont(ofSize: 12, weight: .heavy),
@@ -801,7 +791,7 @@ final class BubbleView: NSView, NSTextViewDelegate {
             noteScroll.frame = NSRect(x: Self.pad, y: y, width: inner, height: Self.noteH)
             let current = all.indices.contains(noteIndex) ? all[noteIndex] : nil
             noteText.isEditable = current != nil
-            // 쓰고 있는 중에는 글자를 덮어쓰지 않는다. 다른 메모로 넘어갔을 때만 바꾼다
+            // Never overwrite text while the user is typing. Only replace it when moving to a different memo
             if current?.id != shownNote || (window?.firstResponder !== noteText && noteText.string != (current?.text ?? "")) {
                 noteText.string = current?.text ?? ""
                 shownNote = current?.id
@@ -864,7 +854,7 @@ final class BubbleView: NSView, NSTextViewDelegate {
         window?.makeFirstResponder(noteText)
     }
 
-    // 실수로 지우지 않게 두 번 눌러야 지워진다
+    // It takes two presses to delete, to avoid accidents
     @objc func removeNote() {
         if Date() < confirmDeleteUntil {
             confirmDeleteUntil = .distantPast
@@ -887,7 +877,7 @@ final class BubbleView: NSView, NSTextViewDelegate {
 
         drawPixelBubble(body: body, tailX: tailX, tailOnTop: tailOnTop)
 
-        // 고른 탭 밑의 굵은 줄과, 탭 줄 전체 밑의 점선
+        // A thick line under the selected tab, and a dotted line under the whole tab row
         let active = showsNotes ? memoTab : todoTab
         ink.setFill()
         NSRect(x: active.frame.minX + 6, y: active.frame.maxY + 1, width: active.frame.width - 12, height: 3).fill()
@@ -895,11 +885,11 @@ final class BubbleView: NSView, NSTextViewDelegate {
         var x = Self.pad
         while x < bounds.width - Self.pad {
             NSRect(x: x, y: active.frame.maxY + 5, width: 3, height: 1.5).fill()
-            if !showsNotes { NSRect(x: x, y: field.frame.minY - 4, width: 3, height: 1.5).fill() }  // 입력칸 위
+            if !showsNotes { NSRect(x: x, y: field.frame.minY - 4, width: 3, height: 1.5).fill() }  // Above the input field
             x += 6
         }
 
-        // 제목 오른쪽의 작은 완료율 고리
+        // A small completion ring to the right of the heading
         let total = store.todos.count
         if !showsNotes && total > 0 {
             drawRing(center: NSPoint(x: bounds.width - Self.pad - 8, y: contentTop + 9), radius: 6, width: 3,
@@ -914,14 +904,14 @@ final class KeyPanel: NSPanel {
 
 // MARK: - Food and toys
 
-// 손으로 집어서 옮길 수 있는 작은 물건 (밥그릇, 털실 공)
+// A small thing that can be picked up and moved by hand (the food bowl, the yarn ball)
 class ItemView: NSView {
     var px: CGFloat = 3 { didSet { needsDisplay = true } }
     var rows: [String] { [] }
     var neededSize: NSSize { NSSize(width: CGFloat(rows[0].count) * px, height: CGFloat(rows.count) * px) }
 
     var onGrab: (() -> Void)?
-    var onDrop: ((NSPoint) -> Void)?  // 놓는 순간의 속도 (포인트/초)
+    var onDrop: ((NSPoint) -> Void)?  // Velocity at the moment of release (points per second)
 
     var grabOffset = NSPoint.zero
     var trail: [(p: NSPoint, t: TimeInterval)] = []
@@ -962,7 +952,7 @@ class ItemView: NSView {
     }
 }
 
-// 밥그릇. 먹을수록 단계가 올라가고 마지막 단계는 빈 그릇
+// Food bowl. The stage rises as it is eaten; the last stage is an empty bowl
 let bowlStages = [
     ["...FFFF...", "..FFFFFF..", "KKKKKKKKKK", ".KDDDDDDK.", "..KKKKKK.."],
     ["..........", "..FFFFFF..", "KKKKKKKKKK", ".KDDDDDDK.", "..KKKKKK.."],
@@ -974,7 +964,7 @@ final class BowlView: ItemView {
     override var rows: [String] { bowlStages[min(stage, bowlStages.count - 1)] }
 }
 
-// 털실 공. 굴러갈 때 두 장을 번갈아 보여준다
+// Yarn ball. Two frames alternate as it rolls
 let ballFrames = [
     ["..KKKK..", ".KRrRRK.", "KRRrRRrK", "KrRRrRRK", "KRrRRrRK", "KRRrRRrK", ".KRRrRK.", "..KKKK.."],
     ["..KKKK..", ".KRRrRK.", "KrRRrRRK", "KRrRRrRK", "KRRrRRrK", "KrRRrRRK", ".KRrRRK.", "..KKKK.."],
@@ -987,13 +977,13 @@ final class BallView: ItemView {
 
 // MARK: - Other apps' windows
 
-// 다른 앱의 보통 창. frame 은 Cocoa 좌표 (왼쪽 아래가 원점)
+// An ordinary window of another app. `frame` is in Cocoa coordinates (origin at the bottom left)
 struct Win {
     let id: CGWindowID
     let frame: NSRect
 }
 
-// 앞에 있는 창부터 순서대로. 창 위치만 읽고 내용이나 제목은 보지 않는다
+// Front to back. Only window positions are read, never their contents or titles
 func visibleWindows() -> [Win] {
     let options: CGWindowListOption = [.optionOnScreenOnly, .excludeDesktopElements]
     guard let list = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]] else { return [] }
@@ -1011,25 +1001,25 @@ func visibleWindows() -> [Win] {
     }
 }
 
-// 맥북 화면 위쪽 가운데의 노치(카메라 자리)가 가리는 가로 범위.
-// 바닥 높이 y 에 키 height 인 것이 메뉴 막대 높이까지 올라올 때만 값이 있다
+// The horizontal range hidden by the notch (camera housing) at the top centre of a MacBook screen.
+// Only returns a value when something `height` tall with its floor at `y` reaches up into the menu bar
 func notchRange(atY y: CGFloat, height: CGFloat) -> ClosedRange<CGFloat>? {
     for screen in NSScreen.screens where screen.safeAreaInsets.top > 0 {
         guard let left = screen.auxiliaryTopLeftArea, let right = screen.auxiliaryTopRightArea,
               y < screen.frame.maxY, y + height > screen.frame.maxY - screen.safeAreaInsets.top else { continue }
         let width = screen.frame.width - left.width - right.width
         guard width > 0 else { continue }
-        let margin: CGFloat = 8  // 노치 가장자리에 바짝 붙지 않게
+        let margin: CGFloat = 8  // Keep a little clear of the notch's edge
         return (screen.frame.midX - width / 2 - margin)...(screen.frame.midX + width / 2 + margin)
     }
     return nil
 }
 
-// 고양이가 올라앉은 창
+// The window the cat is sitting on
 struct Perch {
     let id: CGWindowID
     var bounds: NSRect
-    var offsetX: CGFloat  // 창 왼쪽 끝에서 고양이까지의 거리
+    var offsetX: CGFloat  // Distance from the window's left edge to the cat
 }
 
 let debugLog = ProcessInfo.processInfo.environment["PIXELCAT_DEBUG"] != nil
@@ -1048,14 +1038,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var quipPanel: NSPanel!
     var quip: QuipView!
     var quipToken = 0
-    var quipsOn = false  // 고양이가 혼자 한마디씩 하는 작은 말풍선
+    var quipsOn = false  // The small bubbles where the cat talks to itself
 
     var wanderOn = true
-    var motion: Timer?   // 걷기나 점프가 진행 중일 때만 있음
-    var perch: Perch?    // nil 이면 바닥
-    var homeY: CGFloat = 0  // 바닥 높이 (드래그해서 놓은 곳)
-    var creeping = false    // 창 위에서 숨은 채로 천천히 옮겨 가는 중
-    var sitUpUntil = Date.distantPast  // 이 시각까지는 숨지 않고 올라앉아 있음
+    var motion: Timer?   // Exists only while a walk or jump is in progress
+    var perch: Perch?    // nil means on the floor
+    var homeY: CGFloat = 0  // Floor height (wherever the cat was dropped by hand)
+    var creeping = false    // Shuffling sideways while hidden on a window
+    var sitUpUntil = Date.distantPast  // Until this time, sit up instead of hiding
 
     var bowlPanel: NSPanel!
     var bowl: BowlView!
@@ -1065,21 +1055,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var snoreTimer: Timer?
     var lastFollow = Date.distantPast
 
-    // 콘솔에서 바꿀 수 있는 값들
-    var runSpeed: CGFloat = 3.6   // 뛸 때 한 틱(0.05초)에 가는 거리
-    var pace: Double = 9.5        // 다음 행동까지 평균 몇 초
-    var climbChance = 55          // 바닥에 있을 때 창으로 올라갈 확률 (%)
-    var sleepChance = 12          // 행동을 고를 때 잠들 확률 (%)
-    var followChance = 30         // 마우스가 근처에 있을 때 1초마다 따라갈 확률 (%)
-    var feedOnDone = true         // 할 일을 끝내면 밥을 준다
-    var hub: Hub!                 // 본 창, 메뉴 막대, 상태 아이콘
-    var hunger: Double = 20       // 0(배부름) ~ 100(몹시 배고픔)
-    var bowlPerchOffset: CGFloat? // 창 위에 놓인 밥그릇이 창 왼쪽 끝에서 떨어진 거리
+    // Values the app window can change
+    var runSpeed: CGFloat = 3.6   // Distance covered per tick (0.05 s) when running
+    var pace: Double = 9.5        // Average seconds until the next action
+    var climbChance = 55          // Chance to climb a window when on the floor (%)
+    var sleepChance = 12          // Chance to fall asleep when picking an action (%)
+    var followChance = 30         // Chance per second to follow the mouse when it is nearby (%)
+    var feedOnDone = true         // Finishing a to-do puts out food
+    var hub: Hub!                 // The app window, main menu and status item
+    var hunger: Double = 20       // 0 (full) to 100 (starving)
+    var bowlPerchOffset: CGFloat? // For a bowl placed on a window: its distance from the window's left edge
 
     enum FocusPhase { case idle, focus, rest }
     var focusPhase = FocusPhase.idle
-    var focusEnds: Date?                 // 달리는 중이면 끝나는 시각
-    var focusRemaining: TimeInterval = 0 // 멈춰 있을 때 남은 시간
+    var focusEnds: Date?                 // When it ends, if running
+    var focusRemaining: TimeInterval = 0 // Time left while paused
     var focusMinutes = 25
     var breakMinutes = 5
     var seconds = 0
@@ -1087,7 +1077,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var ballPanel: NSPanel!
     var ball: BallView!
     var ballTimer: Timer?
-    var ballV = NSPoint.zero  // 한 틱에 움직이는 거리
+    var ballV = NSPoint.zero  // Distance moved per tick
     var ballHeld = false
     var playing = false
     var ballToken = 0
@@ -1095,17 +1085,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var hasFood: Bool { bowlPanel.isVisible && !bowlHeld && bowl.stage < bowlStages.count - 1 }
 
     var bodyHeight: CGFloat { CGFloat(catView.design.rows.count) * catView.px }
-    // 앞발을 걸치고 있을 때는 창을 그만큼 내려서 발이 모서리 아래로 나오게 한다
+    // While the paws hook over the edge, lower the panel by that much so they hang below it
     var peekDrop: CGFloat { catView.inPeek ? CGFloat(pawOverhang) * catView.px : 0 }
     var idle: Bool { motion == nil && !asleep && !playing && !away && !catView.isBusy && !bubblePanel.isVisible }
 
-    // 공놀이나 알림 때문에 바닥 줄을 떠나 화면 어딘가에 떠 있는 상태. 이때 있는 곳을 바닥으로 저장하면 안 된다
+    // Away from the floor line, somewhere on screen, because of ball play or a reminder. The current spot must not be saved as the floor
     var away = false
     var ringing = false
     var jumping = false
     var ringTimer: Timer?
     var ringToken = 0
-    var awayUntil = Date.distantPast  // 이 시각까지는 떠 있는 채로 둔다 (말하는 중)
+    var awayUntil = Date.distantPast  // Stay away until this time (still talking)
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let d = UserDefaults.standard
@@ -1130,10 +1120,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         configure(catPanel)
         catView.onClick = { [weak self] clicks in
             guard let self else { return }
-            if self.ringing {  // 울리는 중이면 클릭은 소리 끄기
+            if self.ringing {  // While ringing, a click silences it
                 self.stopRinging()
             } else if self.asleep {
-                if clicks >= 2 { self.wake() }  // 자는 고양이는 더블클릭해야 깬다
+                if clicks >= 2 { self.wake() }  // A sleeping cat needs a double-click to wake
             } else if clicks == 1 {
                 self.toggleBubble()
             }
@@ -1211,7 +1201,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         scheduleAct()
 
         if d.object(forKey: "hunger") != nil {
-            // 꺼져 있던 동안에도 배는 고파진다
+            // The cat gets hungry even while the app is closed
             let away = Date().timeIntervalSince1970 - d.double(forKey: "hungerAt")
             hunger = min(100, d.double(forKey: "hunger") + max(0, away) / 360)
         }
@@ -1226,7 +1216,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         hub.install()
 
-        // 메뉴를 누른 것과 똑같은 경로로 시험해 볼 수 있게
+        // Lets tests follow exactly the same path as choosing the menu item
         let env = ProcessInfo.processInfo.environment
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
             if let dir = env["PIXELCAT_SCREENSHOTS"] { self?.hub.snapshotAll(to: dir) { exit(0) } }
@@ -1243,7 +1233,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if env["PIXELCAT_TEST_REMIND"] != nil { self?.comeAndSay("Time for: test reminder") }
             if env["PIXELCAT_TEST_DUE"] != nil {
                 log("set due via popover path: \(self?.hub.testSetDue(after: 6) ?? false)")
-                DispatchQueue.main.asyncAfter(deadline: .now() + 22) {  // 시험이 끝나면 원래대로
+                DispatchQueue.main.asyncAfter(deadline: .now() + 22) {  // Put things back once the test is over
                     self?.stopRinging()
                     if self?.store.todos.isEmpty == false {
                         self?.store.todos[0].due = nil
@@ -1252,7 +1242,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     log("test due cleared")
                 }
             }
-            if env["PIXELCAT_TEST_TIMER"] != nil {  // 5초짜리 타이머를 돌려 본다
+            if env["PIXELCAT_TEST_TIMER"] != nil {  // Run a five-second timer
                 self?.hub.timersPane.start(seconds: 5, label: "__test")
                 log("test timer started")
                 DispatchQueue.main.asyncAfter(deadline: .now() + 14) {
@@ -1267,7 +1257,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = false
-        // 메뉴 막대보다 위. 화면을 꽉 채운 창 위(메뉴 막대 자리)에도 앉을 수 있게
+        // Above the menu bar, so the cat can also sit on top of a full-screen-height window (in the menu bar area)
         panel.level = NSWindow.Level(rawValue: NSWindow.Level.statusBar.rawValue + 1)
         panel.hidesOnDeactivate = false
         panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary]
@@ -1303,7 +1293,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         bubble.rebuild()
     }
 
-    // force 면 혼잣말을 꺼 놔도 띄운다 (알림처럼 꼭 전해야 하는 말)
+    // `force` shows it even when chatter is off (for things that must be said, like a reminder)
     func say(_ text: String, force: Bool = false, seconds: Double = 2.4) {
         guard quipsOn || force else { return }
         if bubblePanel.isVisible {
@@ -1316,7 +1306,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         showQuip(for: seconds)
     }
 
-    // 쓰다듬으면 뜨는 하트. 혼잣말을 꺼 놔도 뜬다
+    // The heart shown when petted. It appears even when chatter is off
     func showHeart() {
         guard !asleep, !bubblePanel.isVisible else { return }
         quip.showsHeart = true
@@ -1357,9 +1347,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         UserDefaults.standard.set(Double(homeY), forKey: "catY")
     }
 
-    // 손으로 끌어다 놓으면 거기가 새 바닥
+    // Wherever the cat is dropped by hand becomes the new floor
     func catDragged() {
-        away = false  // 손으로 놓은 곳이 새 바닥
+        away = false  // Where it was dropped is the new floor
         catView.standUp()
         cancelMotion()
         perch = nil
@@ -1374,13 +1364,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if bubblePanel.isVisible { layoutBubble() }
     }
 
-    // 올라앉은 창이 움직이면 따라가고, 창이 사라지거나 가려지면 바닥으로 내려온다
+    // Follow the window being sat on when it moves, and come down to the floor if it disappears or gets covered
     func follow() {
         guard let p = perch, !catView.pressed else {
             catView.sinkTarget = 0
             return
         }
-        // 창 위에서는 기본이 빼꼼. 건드리거나 말할 때, 뛸 때만 올라온다
+        // On a window the default is to peek. The cat only rises when touched, talking or running
         let hiding = (motion == nil || creeping) && !bubblePanel.isVisible && !hasFood && Date() > sitUpUntil
         catView.sinkTarget = hiding ? catView.hideDepth : 0
         let wins = visibleWindows()
@@ -1398,7 +1388,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let catW = catPanel.frame.width
         var x = min(max(f.minX + p.offsetX, f.minX), max(f.minX, f.maxX - catW))
-        // 창이 움직여서 노치 밑으로 들어가게 되면 가까운 쪽 옆으로 비켜 앉는다
+        // If the window moves the cat under the notch, step aside to the nearer side
         if let notch = notchRange(atY: f.maxY, height: bodyHeight), x + catW > notch.lowerBound, x < notch.upperBound {
             let goLeft = x + catW / 2 < (notch.lowerBound + notch.upperBound) / 2
             x = goLeft ? notch.lowerBound - catW : notch.upperBound
@@ -1426,7 +1416,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: Motion
 
-    // 뛸 때는 다리 그림을 순서대로 넘기고, 걸을 때는 두 박자로 들썩인다
+    // Running cycles through the leg frames in order; walking bobs on two beats
     func stepFrame(_ tick: Int, run: Bool) -> Int {
         run ? (tick / 2) % max(catView.design.legs.count, 2) + 1 : (tick / 6) % 2 + 1
     }
@@ -1447,7 +1437,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    // run 이면 다리를 내고 빠르게 뛰고, 아니면 식빵 자세 그대로 천천히 들썩이며 간다
+    // With `run` the legs come out and it moves fast; otherwise it shuffles along slowly in loaf pose
     func walk(to targetX: CGFloat, run: Bool = false, then done: (() -> Void)? = nil) {
         cancelMotion()
         wake()
@@ -1456,12 +1446,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         catView.running = run
         creeping = !run && perch != nil
         catView.facingRight = targetX > catPanel.frame.minX
-        var x = catPanel.frame.minX  // 창 좌표는 반올림되므로 위치는 따로 누적한다
+        var x = catPanel.frame.minX  // Window coordinates get rounded, so the position is accumulated separately
         var tick = 0
         let t = Timer(timeInterval: 0.05, repeats: true) { [weak self] _ in
             guard let self else { return }
             var o = self.catPanel.frame.origin
-            if abs(o.x - x) > 3 {  // 다른 무언가가 고양이를 옮겼으면 걷는 시늉만 하지 말고 멈춘다
+            if abs(o.x - x) > 3 {  // If something else moved the cat, stop instead of walking on the spot
                 log("walk interrupted: window at \(o.x), expected \(x)")
                 self.cancelMotion()
                 return
@@ -1482,14 +1472,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if let b = self.perch?.bounds { self.perch?.offsetX = o.x - b.minX }
             let frame = self.stepFrame(tick, run: run)
             self.catView.walkFrame = frame
-            if run { self.catView.jump = frame == 1 ? 1 : 0 }  // 쭉 뻗을 때는 살짝 떠 있음
+            if run { self.catView.jump = frame == 1 ? 1 : 0 }  // Slightly airborne on the stretch frame
             if tick % 8 == 0 { self.catView.wag.toggle() }
         }
         RunLoop.main.add(t, forMode: .common)
         motion = t
     }
 
-    // 포물선으로 뛰어서 이동. landing 이 있으면 그 창 위에 앉고, 없으면 바닥에 내린다
+    // Move in an arc. With `landing` the cat sits on that window, otherwise it lands on the floor
     func jump(to target: NSPoint, landing: Perch? = nil, then done: (() -> Void)? = nil) {
         cancelMotion()
         wake()
@@ -1499,7 +1489,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         start.y += peekDrop
         catView.standUp()
         let dist = hypot(target.x - start.x, target.y - start.y)
-        // 거리에 맞춰 시간을 늘린다 (뛰는 속도의 2.5배쯤). 멀리 갈 때 순간이동처럼 보이지 않게
+        // Scale the time with distance (about 2.5× running speed) so long jumps do not look like teleporting
         let frames = max(18, min(120, Int(dist / (runSpeed * 2.5))))
         let peak = min(140, 30 + dist * 0.12)
         catView.facingRight = target.x > start.x
@@ -1509,13 +1499,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         var n = 0
         let t = Timer(timeInterval: 0.03, repeats: true) { [weak self] _ in
             guard let self else { return }
-            if self.catView.pressed {  // 공중에서 붙잡힘
+            if self.catView.pressed {  // Grabbed in mid-air
                 self.cancelMotion()
                 self.away = true
                 return
             }
             n += 1
-            self.catView.walkFrame = self.stepFrame(n, run: true)  // 공중에서도 발을 구른다
+            self.catView.walkFrame = self.stepFrame(n, run: true)  // Keep the paws going in the air
             let k = CGFloat(n) / CGFloat(frames)
             self.moveCat(to: NSPoint(x: start.x + (target.x - start.x) * k,
                                      y: start.y + (target.y - start.y) * k + peak * 4 * k * (1 - k)))
@@ -1543,7 +1533,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         jump(to: NSPoint(x: x, y: homeY), then: done)
     }
 
-    // wins[i] 창 윗변에서 다른 창에 가려지지 않은 자리를 고른다
+    // Pick a spot on the top edge of wins[i] that no other window covers
     func spot(on i: Int, in wins: [Win]) -> NSPoint? {
         let w = wins[i].frame
         let catW = catPanel.frame.width
@@ -1555,7 +1545,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let notch = notchRange(atY: w.maxY, height: bodyHeight)
         for _ in 0..<12 {
             let x = CGFloat.random(in: lo...hi)
-            if let notch = notch, x + catW > notch.lowerBound, x < notch.upperBound { continue }  // 노치 밑은 피한다
+            if let notch = notch, x + catW > notch.lowerBound, x < notch.upperBound { continue }  // Stay out from under the notch
             let foot = NSPoint(x: x + catW / 2, y: w.maxY - 2)
             if !wins[..<i].contains(where: { $0.frame.contains(foot) }) { return NSPoint(x: x, y: w.maxY) }
         }
@@ -1591,14 +1581,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func stroll(allowRun: Bool = true) {
         guard let range = walkRange else { return }
         let start = catPanel.frame.minX
-        let run = allowRun && Int.random(in: 0..<4) == 0  // 가끔은 우다다
+        let run = allowRun && Int.random(in: 0..<4) == 0  // Sometimes it gets the zoomies
         let distance = (run ? CGFloat.random(in: 250...600) : CGFloat.random(in: 60...220)) * (Bool.random() ? 1 : -1)
         var target = start + distance
         if !range.contains(target) { target = start - distance }
         walk(to: min(max(target, range.lowerBound), range.upperBound), run: run)
     }
 
-    // 마우스 쪽으로 후다닥 달려간다
+    // Dash towards the mouse
     func chaseMouse() {
         guard let range = walkRange else { return }
         let target = min(max(NSEvent.mouseLocation.x - catPanel.frame.width / 2, range.lowerBound), range.upperBound)
@@ -1616,7 +1606,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: Food
 
-    // 밥그릇을 고양이가 서 있는 줄 위, 조금 떨어진 곳에 놓는다. 놓인 그릇은 손으로 끌어서 옮길 수 있다
+    // Put the bowl on the cat's own line, a little way off. Once placed it can be dragged by hand
     @objc func putFood() {
         if eating { cancelMotion() }
         bowlHeld = false
@@ -1635,7 +1625,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in self?.goEat() }
     }
 
-    // 밥그릇 옆으로 걸어간다 (멀면 뛴다). 점프는 하지 않도록 밥그릇을 고양이가 서 있는 줄로 옮겨 놓는다
+    // Walk to the bowl (run if it is far). To avoid jumping, the bowl is moved onto the line the cat stands on
     func goEat() {
         guard hasFood, !playing, !away, motion == nil, !catView.pressed else { return }
         wake()
@@ -1649,7 +1639,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         b.origin.x = min(max(b.minX, range.lowerBound), range.upperBound + cat.width - b.width)
         b.origin.y = cat.minY
         bowlPanel.setFrameOrigin(b.origin)
-        bowlPerchOffset = perch.map { b.minX - $0.bounds.minX }  // 창 위라면 창을 따라다니게 기억해 둔다
+        bowlPerchOffset = perch.map { b.minX - $0.bounds.minX }  // If on a window, remember the offset so the bowl follows the window
 
         let overlap = 2 * catView.px
         var fromRight = cat.midX > b.midX
@@ -1676,7 +1666,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let t = Timer(timeInterval: 0.18, repeats: true) { [weak self] _ in
             guard let self else { return }
             tick += 1
-            self.catView.dip = tick % 2  // 고개 까딱까딱
+            self.catView.dip = tick % 2  // Nodding while eating
             if tick % 8 == 0 { self.bowl.stage += 1 }
             if self.bowl.stage >= bowlStages.count - 1 { self.finishEating() }
         }
@@ -1712,11 +1702,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let cat = catPanel.frame
         ballPanel.setFrameOrigin(NSPoint(x: cat.midX, y: cat.minY + bodyHeight + 20))
         ballPanel.orderFrontRegardless()
-        let angle = CGFloat.random(in: 0.25...0.75) * .pi  // 위쪽으로 툭
+        let angle = CGFloat.random(in: 0.25...0.75) * .pi  // A little toss upwards
         throwBall(velocity: NSPoint(x: cos(angle) * 400, y: sin(angle) * 400))
     }
 
-    // 공을 놓거나 던졌을 때. 놀고 있지 않았으면 놀이를 시작한다
+    // The ball was dropped or thrown. Start playing if not already
     func throwBall(velocity: NSPoint) {
         ballHeld = false
         var v = NSPoint(x: velocity.x * 0.03, y: velocity.y * 0.03)
@@ -1728,8 +1718,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if !playing { startPlay() }
     }
 
-    // 공은 화면 안을 자유롭게 굴러다니며 가장자리에서 튄다. 고양이는 어디든 쫓아가서 앞발로 쳐 내고,
-    // 충분히 놀면 만족해서 원래 있던 높이로 돌아간다
+    // The ball rolls freely around the screen and bounces off the edges. The cat chases it anywhere and bats it away,
+    // and once it has had enough it goes back to the height it came from
     func startPlay() {
         wake()
         if eating { cancelMotion() }
@@ -1784,12 +1774,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self.catView.running = false
                 self.catView.jump = 0
             }
-            if tick > 6000 {  // 3분이 지나면 그만
+            if tick > 6000 {  // Give up after three minutes
                 rest()
                 self.stopPlay()
                 return
             }
-            // 붙잡혀 있거나 할 일 창이 열려 있으면 공만 굴러간다. 공을 손에 들고 있을 때도 기다린다
+            // While the cat is held or the to-do bubble is open, only the ball moves. It also waits while the ball is held
             guard self.motion == nil, !self.catView.pressed, !self.bubblePanel.isVisible, !self.ballHeld,
                   Date() > restUntil else {
                 rest()
@@ -1811,7 +1801,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     self.stopPlay(caught: true)
                     return
                 }
-                // 고양이 반대쪽으로, 좌우로 조금 빗나가게 쳐 낸다
+                // Bat it away from the cat, a little off to one side
                 let away = atan2(ballCenter.y - (cat.minY + self.bodyHeight / 2), ballCenter.x - cat.midX)
                 let angle = away + CGFloat.random(in: -1.0...1.0)
                 let power = CGFloat.random(in: 10...17)
@@ -1847,21 +1837,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             catView.hop([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
             say(["Got it!", "Mine now", "Throw it again"].randomElement()!)
         }
-        // 공은 잠깐 남겨 둔다. 그사이 다시 집어서 던지면 또 논다
+        // Leave the ball for a moment. Pick it up and throw it again and play resumes
         ballToken += 1
         let token = ballToken
         DispatchQueue.main.asyncAfter(deadline: .now() + 20) { [weak self] in
             guard let self, self.ballToken == token, !self.playing, !self.ballHeld else { return }
             self.ballPanel.orderOut(nil)
         }
-        // 놀던 자리에서 원래 바닥 높이로 뛰어 돌아간다
+        // Run back from wherever play ended to the original floor height
         DispatchQueue.main.asyncAfter(deadline: .now() + (caught ? 1.2 : 0)) { [weak self] in
             guard let self, !self.playing, self.motion == nil, !self.catView.pressed else { return }
             self.runHome()
         }
     }
 
-    // 공중에 떠 있는 고양이를 바닥 줄까지 곧장 달려서 데려온다 (점프 없이)
+    // Bring a cat that is floating mid-screen straight back to its floor line by running (no jump)
     func runHome() {
         let cat = catPanel.frame
         let screen = (NSScreen.screens.first { $0.frame.contains(NSPoint(x: cat.midX, y: homeY + 1)) }
@@ -1908,7 +1898,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         asleep = true
         catView.asleep = true
         hideQuip()
-        let sizes = [0, 1, 2, 3, 3, 2, 1, 0]  // 숨 쉴 때마다 콧방울이 부풀었다 줄어든다
+        let sizes = [0, 1, 2, 3, 3, 2, 1, 0]  // The nose bubble swells and shrinks with each breath
         var tick = 0
         let t = Timer(timeInterval: 0.4, repeats: true) { [weak self] _ in
             guard let self else { return }
@@ -1943,7 +1933,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    // 마우스가 근처에 오면 가끔 졸졸 따라다닌다. 멀면 뛰고 가까우면 걷고, 창 위에서는 매달린 채로 옮겨 간다
+    // When the mouse comes near, sometimes trail after it: run if far, walk if close, and shuffle along while hanging if on a window
     func followMouse() {
         cancelMotion()
         hideQuip()
@@ -1965,7 +1955,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             let target = min(max(mouse.x - cat.width / 2, range.lowerBound), range.upperBound)
             let left = abs(target - cat.minX)
-            if left < 8 {  // 다 왔으면 앉아서 기다림
+            if left < 8 {  // Arrived: sit and wait
                 self.catView.walkFrame = 0
                 self.catView.running = false
                 self.catView.jump = 0
@@ -2006,16 +1996,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func act() {
-        if hasFood && !away {  // 밥이 있으면 다른 건 제쳐두고 먹으러 간다
+        if hasFood && !away {  // If there is food, drop everything and go eat
             goEat()
             return
         }
         if playing { return }
-        if away {  // 어쩌다 공중에 남았으면 제자리로 돌아간다
+        if away {  // If somehow left in mid-air, go back home
             if motion == nil && !catView.pressed && !bubblePanel.isVisible && Date() > awayUntil { runHome() }
             return
         }
-        if asleep {  // 한 번 잠들면 평균 1~2분쯤 잔다. 집중 시간에는 끝날 때까지 잔다
+        if asleep {  // Once asleep, sleep for a minute or two on average. During focus time, sleep until it ends
             if !focusing && Int.random(in: 0..<100) < 10 { wake() }
             return
         }
@@ -2024,20 +2014,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             fallAsleep()
             return
         }
-        if hunger >= 75 && Int.random(in: 0..<100) < 35 {  // 배고프면 돌아다니는 대신 밥 달라고 한다
+        if hunger >= 75 && Int.random(in: 0..<100) < 35 {  // When hungry, ask for food instead of wandering
             say("I'm hungry…", force: true, seconds: 3)
             return
         }
         let roll = Int.random(in: 0..<100)
         if perch != nil {
-            // 창 위에서는 거의 항상 매달려서 내다보고, 가끔만 움직인다
+            // On a window, almost always hang and peek; move only now and then
             if Int.random(in: 0..<100) < sleepChance / 2 {
                 fallAsleep()
                 return
             }
             switch roll {
             case ..<87: break
-            case ..<90: sitUpUntil = Date() + 3  // 잠깐 올라와서 두리번
+            case ..<90: sitUpUntil = Date() + 3  // Pop up for a quick look around
             case ..<94: if !hopOntoWindow(frontOnly: false) { dropToFloor() }
             default: dropToFloor()
             }
@@ -2052,7 +2042,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    // 다른 앱으로 넘어가면 가끔 그 창 위로 따라와서 참견한다
+    // When the user switches apps, sometimes follow onto that window to butt in
     @objc func appActivated(_ note: Notification) {
         guard wanderOn, !hasFood, Int.random(in: 0..<100) < 60 else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { [weak self] in
@@ -2115,7 +2105,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         resizeCat()
     }
 
-    // 발밑 가운데를 고정한 채로 창 크기를 맞춘다
+    // Resize the panel while keeping the middle of the cat's feet fixed
     func resizeCat() {
         cancelMotion()
         if catView.inPeek {
@@ -2156,7 +2146,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: Hub hooks
 
-    // 앱 아이콘을 다시 열면 본 창이 뜬다
+    // Reopening the app icon shows the app window
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         hub.show()
         return true
@@ -2171,7 +2161,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if seconds % 5 == 0 { checkDue() }
         if let text = hub.timersPane.fire(at: Date()) { ring(text) }
         if seconds % 60 == 0 {
-            hunger = min(100, hunger + 100.0 / 600)  // 열 시간이면 완전히 배고파진다
+            hunger = min(100, hunger + 100.0 / 600)  // Fully hungry after ten hours
             saveHunger()
         }
         hub.tick()
@@ -2221,7 +2211,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hub.refresh()
     }
 
-    // 고양이가 지금 뭘 하고 있는지 한마디로
+    // What the cat is doing right now, in a word or two
     var activity: String {
         if ringing { return "Ringing for you" }
         if eating { return "Eating" }
@@ -2237,10 +2227,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: To-dos
 
-    // 할 일이 바뀔 때마다 (고양이 말풍선에서든 본 창에서든) 불린다
+    // Called whenever the to-dos change (from the cat's bubble or the app window)
     func todosChanged(_ old: [Todo], _ new: [Todo]) {
         let was = old.filter(\.done).count, now = new.filter(\.done).count
-        if new.count >= old.count && now != was {  // 지워서 줄어든 건 세지 않는다
+        if new.count >= old.count && now != was {  // A count that drops because items were deleted is ignored
             var h = history
             h[dayKey(Date())] = max(0, (h[dayKey(Date())] ?? 0) + now - was)
             if !demoMode { UserDefaults.standard.set(h, forKey: "history") }
@@ -2259,9 +2249,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return f.string(from: date)
     }
 
-    // 날짜별로 끝낸 할 일 개수
+    // To-dos finished per day
     var history: [String: Int] {
-        if demoMode {  // 보기용: 지난 7일
+        if demoMode {  // Sample data: the last 7 days
             let counts = [3, 5, 2, 6, 4, 7, 3]
             return Dictionary(uniqueKeysWithValues: counts.enumerated().map {
                 (dayKey(Date().addingTimeInterval(TimeInterval(-86400 * (6 - $0.offset)))), $0.element)
@@ -2271,11 +2261,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
     var doneToday: Int { history[dayKey(Date())] ?? 0 }
 
-    // 오늘까지 하루도 빠짐없이 뭔가를 끝낸 날 수
+    // Days in a row, up to today, on which something was finished
     var streak: Int {
         let h = history
         var day = Date(), n = 0
-        if (h[dayKey(day)] ?? 0) == 0 { day = day.addingTimeInterval(-86400) }  // 오늘 아직이면 어제까지로 센다
+        if (h[dayKey(day)] ?? 0) == 0 { day = day.addingTimeInterval(-86400) }  // If nothing is done yet today, count up to yesterday
         while (h[dayKey(day)] ?? 0) > 0 {
             n += 1
             day = day.addingTimeInterval(-86400)
@@ -2283,7 +2273,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return n
     }
 
-    // 할 일을 하나 끝내면 고양이가 좋아하고, 켜 두었으면 밥도 받는다
+    // Finishing a to-do pleases the cat, and feeds it if that is switched on
     func celebrate() {
         guard !asleep else { return }
         catView.hop(Array(repeating: 0, count: 30))
@@ -2304,7 +2294,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "hungerAt")
     }
 
-    // 지금 기분과 그 이유. 배고픔, 밀린 할 일, 오늘 끝낸 일로 정해진다
+    // The current mood and why. It depends on hunger, overdue to-dos and what was finished today
     var mood: (name: String, detail: String) {
         if asleep { return ("Sleeping", focusing ? "Napping while you focus" : "Double-click the cat to wake it") }
         if hunger >= 75 { return ("Hungry", "Finish a to-do or put out food") }
@@ -2317,7 +2307,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: Reminders
 
-    // 알림 시각이 된 할 일을 찾아서 고양이가 알려 준다
+    // Find a to-do whose reminder time has come and have the cat announce it
     func checkDue() {
         let now = Date()
         for i in store.todos.indices {
@@ -2325,11 +2315,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard !t.done, t.notified != true, let due = t.due, due <= now else { continue }
             store.todos[i].notified = true
             ring("Time for: \(t.text)")
-            return  // 한 번에 하나씩
+            return  // One at a time
         }
     }
 
-    // 소리를 내고, 고양이가 깨어나 마우스 커서가 있는 곳까지 화면을 가로질러 달려와서 말한다
+    // Play a sound, wake the cat, and have it run across the screen to the mouse cursor to say something
     func comeAndSay(_ text: String, hold: Double = 9) {
         log("announce: \(text)")
         NSSound(named: "Glass")?.play()
@@ -2345,7 +2335,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         awayUntil = Date() + 30 + hold
         hideQuip()
 
-        // 커서 바로 아래에 멈춘다. 커서를 가리거나 마우스가 올라간 것으로 치지 않게 조금 띄운다
+        // Stop just below the cursor, with a gap so it neither covers the cursor nor counts as hovering
         var pos = catPanel.frame.origin
         var tick = 0
         catView.running = true
@@ -2364,7 +2354,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let dx = target.x - pos.x, dy = target.y - pos.y
             let dist = hypot(dx, dy)
             tick += 1
-            if dist < 4 || tick > 500 {  // 다 왔거나, 15초를 쫓아도 못 따라잡으면 그 자리에서 말한다
+            if dist < 4 || tick > 500 {  // Arrived, or still not caught up after 15 seconds: say it here
                 self.cancelMotion()
                 log("arrived at cursor")
                 self.say(text, force: true, seconds: hold)
@@ -2373,7 +2363,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 DispatchQueue.main.asyncAfter(deadline: .now() + hold + 0.5) { [weak self] in
                     guard let self, self.ringToken == token, !self.ringing, self.motion == nil, !self.playing,
                           !self.catView.pressed, self.perch == nil else { return }
-                    self.runHome()  // 할 말을 다 했으면 제자리로 돌아간다
+                    self.runHome()  // Done talking: go back home
                 }
                 return
             }
@@ -2392,7 +2382,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: Ringing
 
-    // 타이머와 마감 알림: 고양이가 커서로 달려오고, 고양이를 클릭할 때까지(길어야 1분) 소리가 되풀이된다
+    // Timers and reminders: the cat runs to the cursor and the sound repeats until the cat is clicked (one minute at most)
     func ring(_ text: String) {
         log("ring: \(text)")
         stopRinging(returnHome: false)
@@ -2411,7 +2401,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         RunLoop.main.add(t, forMode: .common)
         ringTimer = t
-        comeAndSay(text, hold: 60)  // 첫 소리는 여기서 난다
+        comeAndSay(text, hold: 60)  // The first sound is played in here
         hub.refresh()
     }
 
@@ -2435,7 +2425,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     var focusing: Bool { focusPhase == .focus && focusEnds != nil }
 
-    // 지금 단계에서 남은 시간
+    // Time left in the current phase
     var focusLeft: TimeInterval {
         if let ends = focusEnds { return max(0, ends.timeIntervalSinceNow) }
         return focusPhase == .idle ? TimeInterval(focusMinutes * 60) : focusRemaining
@@ -2445,9 +2435,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         (UserDefaults.standard.dictionary(forKey: "focusHistory") as? [String: Int])?[dayKey(Date())] ?? 0
     }
 
-    // 시작, 멈춤, 이어서 하기를 한 버튼으로
+    // Start, pause and resume share one button
     @objc func toggleFocus() {
-        if let ends = focusEnds {  // 달리는 중 → 멈춤
+        if let ends = focusEnds {  // Running → pause
             focusRemaining = max(0, ends.timeIntervalSinceNow)
             focusEnds = nil
             if focusPhase == .focus { wake() }
@@ -2479,7 +2469,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hub.refresh()
     }
 
-    // 집중하는 동안 고양이는 방해하지 않고 잔다
+    // While the user focuses, the cat sleeps and stays out of the way
     func napForFocus() {
         if playing { stopPlay() }
         guard !hasFood, !catView.pressed else { return }
@@ -2535,7 +2525,7 @@ func writePNG(_ view: NSView, _ path: String) {
 let app = NSApplication.shared
 let args = CommandLine.arguments
 if let i = args.firstIndex(of: "--icon"), i + 1 < args.count {
-    // 앱 아이콘: 둥근 네모 바탕에 식빵 고양이
+    // App icon: the loaf cat on a rounded square
     let side: CGFloat = 1024
     let image = NSImage(size: NSSize(width: side, height: side))
     image.lockFocus()
@@ -2560,7 +2550,7 @@ if let i = args.firstIndex(of: "--icon"), i + 1 < args.count {
     exit(0)
 }
 if let i = args.firstIndex(of: "--render"), i + 1 < args.count {
-    // 창을 띄우지 않고 그림만 PNG로 저장 (모양 확인용)
+    // Save pictures as PNG without showing any windows (for checking how things look)
     let dir = args[i + 1]
     for (n, design) in designs.enumerated() {
         let cat = CatView(frame: .zero)
@@ -2629,7 +2619,7 @@ if let i = args.firstIndex(of: "--render"), i + 1 < args.count {
     b.rebuild()
     writePNG(b, dir + "/bubble-memo.png")
 } else {
-    // 종료 신호를 받으면 그냥 죽지 않고 저장을 마친 뒤 끝낸다
+    // On a termination signal, finish saving before quitting instead of just dying
     signal(SIGTERM, SIG_IGN)
     let termination = DispatchSource.makeSignalSource(signal: SIGTERM, queue: .main)
     termination.setEventHandler {

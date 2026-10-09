@@ -1,6 +1,6 @@
 #!/bin/bash
-# 앱을 빌드해서 응용 프로그램 폴더에 설치하고 실행한다
-# 기본은 /Applications, 다른 곳에 깔려면: ./Installer/install.sh ~/Applications
+# Builds the app, installs it into the Applications folder and opens it
+# Defaults to /Applications. To install elsewhere: ./Installer/install.sh ~/Applications
 set -e
 cd "$(dirname "$0")/.."
 

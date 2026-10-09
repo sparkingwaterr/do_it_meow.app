@@ -2,14 +2,12 @@
 
 **A pixel cat that lives on your Mac desktop and keeps your to-dos.** Finish a task and it gets fed.
 
-할 일을 끝내면 밥을 받는, 맥 데스크톱에 사는 픽셀 고양이.
-
 <p align="center">
-  <img src="docs/screenshots/loaf.png" width="150" alt="The cat sitting like a loaf">
+  <img src="docs/screenshots/cat-loaf.png" width="150" alt="The cat sitting like a loaf">
   &nbsp;&nbsp;
-  <img src="docs/screenshots/peek.png" width="150" alt="The cat peeking over a window">
+  <img src="docs/screenshots/cat-peek.png" width="150" alt="The cat peeking over a window">
   &nbsp;&nbsp;
-  <img src="docs/screenshots/sleep.png" width="150" alt="The cat asleep in a nightcap">
+  <img src="docs/screenshots/cat-sleep.png" width="150" alt="The cat asleep in a nightcap">
 </p>
 
 ## The cat

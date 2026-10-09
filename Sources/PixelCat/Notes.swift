@@ -1,13 +1,13 @@
 import Cocoa
 
-// 메모 화면: 왼쪽에 메모 목록, 오른쪽에 글 쓰는 칸. 쓰는 대로 저장된다
+// Notes screen: a list of notes on the left, the editor on the right. Saved as you type
 
 struct Note: Codable {
     var id = UUID()
     var text = ""
     var updated = Date()
 
-    // 첫 줄이 제목이 된다
+    // The first line becomes the title
     var title: String {
         let first = text.split(separator: "\n", omittingEmptySubsequences: true).first.map(String.init) ?? ""
         return first.trimmingCharacters(in: .whitespaces).isEmpty ? "New note" : first
@@ -16,7 +16,7 @@ struct Note: Codable {
 
 final class NotesPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSTextViewDelegate {
     private(set) var notes: [Note] = []
-    var onChange: (() -> Void)?  // 이 화면에서 메모가 바뀌었을 때 (고양이 말풍선이 따라 고친다)
+    var onChange: (() -> Void)?  // Called when a note changes on this screen (the cat's bubble follows along)
     let view = NSView()
     private let table = NSTableView()
     private var textView: NSTextView!
@@ -36,7 +36,7 @@ final class NotesPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NST
             ]
         } else if let data = UserDefaults.standard.data(forKey: "notes"),
            let saved = try? JSONDecoder().decode([Note].self, from: data) {
-            notes = saved.sorted { $0.updated > $1.updated }  // 최근에 고친 것이 위로
+            notes = saved.sorted { $0.updated > $1.updated }  // Most recently edited first
         }
         build()
         if !notes.isEmpty { table.selectRowIndexes([0], byExtendingSelection: false) }
@@ -46,7 +46,7 @@ final class NotesPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NST
     private func save() {
         if demoMode { return }
         if let data = try? JSONEncoder().encode(notes) { UserDefaults.standard.set(data, forKey: "notes") }
-        UserDefaults.standard.synchronize()  // 갑자기 꺼져도 남도록 바로 내려쓴다
+        UserDefaults.standard.synchronize()  // Write to disk right away so nothing is lost if the app dies
     }
 
     private func build() {
@@ -105,7 +105,7 @@ final class NotesPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NST
         ])
     }
 
-    // 고른 메모를 오른쪽 칸에 띄운다
+    // Show the selected note in the editor
     private func showSelection() {
         let row = table.selectedRow
         let has = notes.indices.contains(row)
@@ -125,7 +125,7 @@ final class NotesPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NST
         onChange?()
     }
 
-    // 고양이 말풍선에서 고친 글을 받아 적는다
+    // Take text edited in the cat's bubble
     func update(_ index: Int, text: String) {
         guard notes.indices.contains(index) else { return }
         notes[index].text = text
@@ -187,7 +187,7 @@ final class NotesPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NST
         notes[row].text = textView.string
         notes[row].updated = Date()
         save()
-        table.reloadData(forRowIndexes: [row], columnIndexes: [0])  // 제목과 시각만 고친다
+        table.reloadData(forRowIndexes: [row], columnIndexes: [0])  // Only the title and time need redrawing
         onChange?()
     }
 }

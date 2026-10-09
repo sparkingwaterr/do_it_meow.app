@@ -2,11 +2,11 @@ import Carbon.HIToolbox
 import Cocoa
 import ServiceManagement
 
-// 본 창(개요, 할 일, 집중, 고양이, 설정), 메뉴 막대, 상태 아이콘, 빠른 추가 창
+// The app window (overview, to-dos, notes, timers, calendar, focus, cat, settings), the main menu, the status item and the quick-add panel
 
 // MARK: - Small views
 
-// 옅은 바탕의 둥근 카드
+// A rounded card with a faint background
 final class CardView: NSView {
     init(_ content: NSView, padding: CGFloat = 14) {
         super.init(frame: .zero)
@@ -42,7 +42,7 @@ final class SideButton: NSButton {
     }
 }
 
-// 지난 7일 동안 하루에 끝낸 할 일 수. 한 가지 색 막대이고, 오늘만 진하게 한다
+// To-dos finished per day over the last 7 days. One hue for all bars, with only today at full strength
 final class BarChartView: NSView, NSViewToolTipOwner {
     struct Bar {
         let label: String
@@ -89,7 +89,7 @@ final class BarChartView: NSView, NSViewToolTipOwner {
             let x = CGFloat(i) * slot + (slot - barWidth) / 2
             let h = bar.value == 0 ? 2 : max(5, plotHeight * CGFloat(bar.value) / CGFloat(top))
             let r = min(4, h / 2)
-            let path = NSBezierPath()  // 윗모서리만 둥글게, 바닥은 기준선에 붙인다
+            let path = NSBezierPath()  // Round only the top corners; the bottom sits on the baseline
             path.move(to: NSPoint(x: x, y: plotBottom))
             path.line(to: NSPoint(x: x, y: plotBottom + h - r))
             path.appendArc(withCenter: NSPoint(x: x + r, y: plotBottom + h - r), radius: r,
@@ -111,7 +111,7 @@ final class BarChartView: NSView, NSViewToolTipOwner {
             day.draw(at: NSPoint(x: x + barWidth / 2 - day.size(withAttributes: dayAttrs).width / 2, y: 2),
                      withAttributes: dayAttrs)
 
-            // 숫자는 오늘과 가장 많이 한 날에만 붙인다
+            // Label only today and the best day
             if bar.value > 0 && (bar.today || bar.value == top) {
                 let attrs: [NSAttributedString.Key: Any] = [
                     .font: NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .semibold),
@@ -141,8 +141,8 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
     var statusMenu = NSMenu()
 
     var table: NSTableView?
-    var filter = 0          // 0 전체, 1 오늘, 2 남은 것
-    var visible: [Int] = [] // 표의 줄 → 할 일 번호
+    var filter = 0          // 0 all, 1 today, 2 open
+    var visible: [Int] = [] // Table row → to-do index
     var addField: NSTextField?
     var refocusBlank = false
 
@@ -158,11 +158,11 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
     let timersPane = TimersPane()
     let catPreview = CatView(frame: .zero)
     var previewTimer: Timer?
-    // 달력에는 마감 시간이 있는 할 일을 올린다
+    // The calendar shows to-dos that have a reminder time
     lazy var calendarPane = CalendarPane { [unowned self] in
         self.app.store.todos.compactMap { t in t.due.map { CalendarItem(date: $0, title: t.text, done: t.done) } }
     }
-    let english = Locale(identifier: "en_US")  // 화면 글자가 영어라서 날짜도 영어로 맞춘다
+    let english = Locale(identifier: "en_US")  // The UI is in English, so dates are too
 
     static let pageNames = ["Overview", "To-Dos", "Notes", "Timers", "Calendar", "Focus", "Cat", "Settings"]
     static let pageIcons = ["square.grid.2x2", "checklist", "note.text", "hourglass", "calendar", "timer", "pawprint", "gearshape"]
@@ -189,7 +189,7 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
         updateStatusTitle()
     }
 
-    // 메뉴 막대 아이콘: 부드러운 고양이 발바닥 (시스템 기호). 메뉴 막대 밝기에 맞춰 검정/흰색으로 저절로 바뀐다
+    // Menu bar icon: a smooth cat paw (system symbol). It turns black or white to match the menu bar
     static func menuBarIcon() -> NSImage? {
         let image = NSImage(systemSymbolName: "pawprint.fill", accessibilityDescription: "Pixel Cat")?
             .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 14, weight: .regular))
@@ -202,7 +202,7 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
     func show(page: Int? = nil) {
         if window == nil { build() }
         if let page { select(page) }
-        NSApp.setActivationPolicy(.regular)  // 창이 떠 있는 동안은 Dock 과 메뉴 막대에 나오는 보통 앱
+        NSApp.setActivationPolicy(.regular)  // While the window is open this is a regular app with a Dock icon and menu bar
         NSApp.activate(ignoringOtherApps: true)
         window?.makeKeyAndOrderFront(nil)
         animatePreview(true)
@@ -213,7 +213,7 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
     func windowWillClose(_ notification: Notification) {
         guard (notification.object as? NSWindow) === window else { return }
         animatePreview(false)
-        NSApp.setActivationPolicy(.accessory)  // 창을 닫으면 다시 고양이만 남는다
+        NSApp.setActivationPolicy(.accessory)  // Closing the window leaves just the cat again
     }
 
     func windowDidResignKey(_ notification: Notification) {
@@ -279,7 +279,7 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
         for (i, page) in pages.enumerated() {
             page.translatesAutoresizingMaskIntoConstraints = false
             content.addSubview(page)
-            let stretch = (1...4).contains(i)  // 할 일, 메모, 타이머, 달력은 창 크기를 따라 늘어난다
+            let stretch = (1...4).contains(i)  // To-dos, notes, timers and calendar stretch with the window
             NSLayoutConstraint.activate([
                 page.topAnchor.constraint(equalTo: content.topAnchor, constant: 40),
                 page.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 28),
@@ -373,7 +373,7 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
         return keyed(key, bar)
     }
 
-    // 기분, 이유, 배부른 정도
+    // Mood, the reason for it, and how full the cat is
     private func moodBlock(_ prefix: String) -> NSView {
         vstack([
             caption("Cat"),
@@ -383,7 +383,7 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
         ], spacing: 6)
     }
 
-    // 지금 자세를 그대로 따라 하는 큰 고양이와, 그 옆의 기분
+    // A large cat that copies the current pose, with the mood beside it
     private func catNow() -> NSView {
         catPreview.isPreview = true
         catPreview.px = 6
@@ -396,7 +396,7 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
         return row
     }
 
-    // 창이 떠 있는 동안 미리보기를 초당 열 번 고친다
+    // While the window is open, refresh the preview ten times a second
     private func animatePreview(_ on: Bool) {
         previewTimer?.invalidate()
         previewTimer = nil
@@ -459,7 +459,7 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
     }
 
     private func buildTodos() -> NSView {
-        // 목록 맨 아래에 늘 비어 있는 줄. 여기에 적고 Return 을 누르면 바로 추가되고 다음 빈 줄이 기다린다
+        // A row that is always empty at the end of the list. Type here and press Return to add; the next blank row is ready at once
         let add = NSTextField()
         add.placeholderString = "New to-do"
         add.target = self
@@ -520,7 +520,7 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
             hstack([keyed("td.clear", button("Clear Completed", #selector(AppDelegate.clearDone))),
                     keyed("td.bubble", button("Show on Cat", #selector(AppDelegate.toggleTodoBubble)))]),
         ], spacing: 12)
-        // 거르기 줄과 표는 가로로 꽉 채운다
+        // The filter row and the table fill the width
         for v in [filterRow, scroll] {
             v.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
         }
@@ -607,7 +607,7 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
 
     // MARK: Refresh
 
-    // 한 초마다 불린다. 창이 안 보이면 상태 아이콘만 고친다
+    // Called every second. If the window is hidden, only the status item is updated
     func tick() {
         updateStatusTitle()
         if window?.isVisible == true {
@@ -623,7 +623,7 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
 
     private func updateStatusTitle() {
         let left = app.store.todos.filter { !$0.done }.count
-        // 집중 타이머가 돌면 그 시간을, 아니면 가장 먼저 끝나는 타이머를, 그것도 없으면 남은 할 일 수를 보여 준다
+        // Show the focus timer if it is running, otherwise the timer that ends first, otherwise the number of to-dos left
         let text = app.focusEnds != nil ? clock(app.focusLeft)
             : timersPane.soonest(at: Date()).map { CountdownTimer.clock($0.left) } ?? (left > 0 ? "\(left)" : "")
         statusItem?.button?.title = app.ringing ? " ⏰" : text.isEmpty ? "" : " " + text
@@ -643,7 +643,7 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
         guard window != nil else { return }
         let todos = app.store.todos
 
-        // 오늘로 골라 둔 것이 있으면 그것만으로 완료율을 낸다
+        // If anything is marked for today, the completion rate covers only those
         let scoped = todos.contains(where: \.isToday) ? todos.filter(\.isToday) : todos
         let total = scoped.count, done = scoped.filter(\.done).count
         if let ring = controls["ov.ring"] as? RingView {
@@ -688,7 +688,7 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
         }
         set("ov.next", lines.isEmpty ? "No reminders or timers set." : lines.joined(separator: "\n"))
 
-        // 고양이
+        // Cat
         let mood = app.mood
         for p in ["ov", "cp"] {
             set(p + ".mood", mood.name)
@@ -712,7 +712,7 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
         set("td.hint", filter == 0 ? "Type in the last row and press Return · drag to reorder"
             : "Type in the last row and press Return")
 
-        // 집중
+        // Focus
         let phase = app.focusPhase
         let running = app.focusEnds != nil
         let length = TimeInterval((phase == .rest ? app.breakMinutes : app.focusMinutes) * 60)
@@ -734,7 +734,7 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
         let sessions = app.focusSessionsToday
         set("fo.sessions", "Sessions finished today: \(sessions)")
 
-        // 설정
+        // Settings
         (controls["st.wander"] as? NSButton)?.state = app.wanderOn ? .on : .off
         (controls["st.quips"] as? NSButton)?.state = app.quipsOn ? .on : .off
         (controls["st.feed"] as? NSButton)?.state = app.feedOnDone ? .on : .off
@@ -743,7 +743,7 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
             ? "Only works while the app stays where it is now, so keep it somewhere permanent."
             : loginNote)
         (controls["st.runSpeed"] as? NSSlider)?.doubleValue = Double(app.runSpeed)
-        (controls["st.pace"] as? NSSlider)?.doubleValue = -app.pace  // 오른쪽으로 갈수록 자주 움직이게 뒤집어 둠
+        (controls["st.pace"] as? NSSlider)?.doubleValue = -app.pace  // Negated so that further right means more active
         (controls["st.climbChance"] as? NSSlider)?.doubleValue = Double(app.climbChance)
         (controls["st.sleepChance"] as? NSSlider)?.doubleValue = Double(app.sleepChance)
         (controls["st.followChance"] as? NSSlider)?.doubleValue = Double(app.followChance)
@@ -760,7 +760,7 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
     func reloadTodos() {
         let todos = app.store.todos
         visible = todos.indices.filter { filter == 0 || (filter == 1 && todos[$0].isToday) || (filter == 2 && !todos[$0].done) }
-        // 빈 줄에 쓰고 있었거나 방금 추가했으면, 표를 다시 그린 뒤에도 빈 줄에 커서를 돌려놓는다
+        // If the user was typing in the blank row or just added something, put the cursor back there after the table reloads
         let wasTyping = ((window?.firstResponder as? NSTextView)?.delegate as? NSTextField) === addField && addField != nil
         table?.reloadData()
         if wasTyping || refocusBlank {
@@ -771,19 +771,19 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
         refresh()
     }
 
-    func numberOfRows(in tableView: NSTableView) -> Int { visible.count + 1 }  // 마지막은 늘 빈 줄
+    func numberOfRows(in tableView: NSTableView) -> Int { visible.count + 1 }  // The last row is always blank
 
     private func focusBlankRow() {
         guard let table, let field = addField, window?.isVisible == true else { return }
         table.scrollRowToVisible(visible.count)
-        _ = table.view(atColumn: 1, row: visible.count, makeIfNecessary: true)  // 빈 줄이 화면에 올라오게
+        _ = table.view(atColumn: 1, row: visible.count, makeIfNecessary: true)  // Make sure the blank row has a view
         guard field.window != nil else { return }
         window?.makeFirstResponder(field)
-        field.currentEditor()?.selectedRange = NSRange(location: field.stringValue.count, length: 0)  // 쓰던 글 뒤에 커서
+        field.currentEditor()?.selectedRange = NSRange(location: field.stringValue.count, length: 0)  // Cursor after any text already typed
     }
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
-        if row == visible.count {  // 새 할 일을 받는 빈 줄
+        if row == visible.count {  // The blank row that takes a new to-do
             switch tableColumn?.identifier.rawValue {
             case "done":
                 let plus = label("+", size: 16, weight: .medium, color: .tertiaryLabelColor)
@@ -830,7 +830,7 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
             f.tag = index
             f.target = self
             f.action = #selector(editText(_:))
-            // 줄 가운데에 오도록 한 겹 감싼다
+            // Wrap it so it sits in the middle of the row
             let cell = NSView()
             f.translatesAutoresizingMaskIntoConstraints = false
             cell.addSubview(f)
@@ -871,7 +871,7 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
         }
     }
 
-    // 끌어서 순서 바꾸기 (전체 보기에서만)
+    // Drag to reorder (only in the All view)
     func tableView(_ tableView: NSTableView, pasteboardWriterForRow row: Int) -> NSPasteboardWriting? {
         filter == 0 && row < visible.count ? "\(row)" as NSString : nil
     }
@@ -923,7 +923,7 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
         guard app.store.todos.indices.contains(sender.tag) else { return }
         let text = sender.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
         if text.isEmpty {
-            app.store.todos.remove(at: sender.tag)  // 글자를 다 지우면 항목도 지운다
+            app.store.todos.remove(at: sender.tag)  // Clearing the text deletes the item
         } else if text != app.store.todos[sender.tag].text {
             app.store.todos[sender.tag].text = text
         }
@@ -968,7 +968,7 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
         guard app.store.todos.indices.contains(dueIndex) else { return }
         var todo = app.store.todos[dueIndex]
         todo.due = date
-        todo.notified = nil  // 시각을 바꾸면 다시 알린다
+        todo.notified = nil  // Changing the time means it should ring again
         app.store.todos[dueIndex] = todo
     }
 
@@ -1147,7 +1147,7 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
 
     // MARK: Quick add
 
-    // 어느 앱에서든 Control-Option-T 로 뜨는 한 줄 입력 창
+    // A one-line panel that opens with Control-Option-T from any app
     private func installHotKey() {
         var ref: EventHotKeyRef?
         let id = EventHotKeyID(signature: OSType(0x5043_4154), id: 1)  // 'PCAT'
@@ -1212,7 +1212,7 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
         return false
     }
 
-    // 시험용: 첫 할 일의 ⏰ 를 누르고 몇 초 뒤로 정한 다음 Set 을 누른 것과 같은 경로를 탄다
+    // For testing: follows the same path as clicking the first to-do's clock, picking a time a few seconds away and pressing Set
     func testSetDue(after seconds: TimeInterval) -> Bool {
         show(page: 1)
         guard let t = table, t.numberOfRows > 0,
@@ -1223,7 +1223,7 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
         return app.store.todos.first?.due != nil
     }
 
-    // 시험용: 빈 줄에 글을 넣고 Return 을 누른 것과 같은 경로를 타고, 커서가 다시 빈 줄에 왔는지 알려 준다
+    // For testing: follows the same path as typing in the blank row and pressing Return, then reports whether the cursor came back to the blank row
     func testBlankRow(_ text: String, then report: @escaping (Bool) -> Void) {
         show(page: 1)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
@@ -1240,7 +1240,7 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
 
     // MARK: Screenshots
 
-    // 설명서용: 모든 화면을 밝은 테마와 어두운 테마로 한 번씩 그려서 app-<화면>-<light|dark>.png 로 저장한다
+    // For the README: draw every screen once in light and once in dark, saved as app-<screen>-<light|dark>.png
     func snapshotAll(to dir: String, then done: @escaping () -> Void) {
         show()
         let names = ["overview", "todos", "notes", "timers", "calendar", "focus", "cat", "settings"]
@@ -1264,7 +1264,7 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
                                                  colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) else { return }
                 view.cacheDisplay(in: view.bounds, to: shot)
                 out.size = shot.size
-                // 찍힌 그림에는 창 바탕이 없으므로 그 테마의 창 바탕색을 먼저 깐다
+                // The capture has no window background, so lay down that appearance's window colour first
                 NSGraphicsContext.saveGraphicsState()
                 NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: out)
                 let area = NSRect(origin: .zero, size: shot.size)

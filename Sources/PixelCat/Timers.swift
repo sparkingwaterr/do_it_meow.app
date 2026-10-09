@@ -1,13 +1,13 @@
 import Cocoa
 
-// 타이머 화면: 몇 분 뒤에 울릴지 정해 두면 시간이 다 됐을 때 고양이가 달려와서 울린다. 여러 개를 함께 돌릴 수 있다
+// Timers screen: set how many minutes from now, and when time is up the cat runs over and rings. Several can run at once
 
 struct CountdownTimer: Codable {
     var id = UUID()
     var label = ""
-    var total: TimeInterval      // 처음 맞춘 길이
-    var ends: Date?              // 돌아가는 중이면 끝나는 시각
-    var remaining: TimeInterval  // 멈춰 있을 때 남은 시간
+    var total: TimeInterval      // The length it was set to
+    var ends: Date?              // When it ends, if running
+    var remaining: TimeInterval  // Time left while paused
 
     var running: Bool { ends != nil }
     func left(at now: Date) -> TimeInterval { ends.map { max(0, $0.timeIntervalSince(now)) } ?? remaining }
@@ -63,7 +63,7 @@ final class TimersPane: NSObject, NSTableViewDataSource, NSTableViewDelegate {
         let heading = NSTextField(labelWithString: "Timers")
         heading.font = .systemFont(ofSize: 26, weight: .bold)
 
-        // 자주 쓰는 길이는 누르면 바로 시작한다
+        // Common lengths start with one click
         let presetButtons = Self.presets.map { minutes -> NSButton in
             let b = NSButton(title: "\(minutes) min", target: self, action: #selector(startPreset(_:)))
             b.tag = minutes
@@ -163,7 +163,7 @@ final class TimersPane: NSObject, NSTableViewDataSource, NSTableViewDelegate {
 
     @objc private func testRing() { onTest?() }
 
-    // 시간이 다 된 타이머가 있으면 목록에서 빼고, 말풍선에 쓸 글을 돌려준다. 매초 불린다
+    // If a timer has run out, remove it and return the text for the speech bubble. Called every second
     func fire(at now: Date) -> String? {
         guard let i = timers.firstIndex(where: { $0.running && $0.left(at: now) <= 0 }) else { return nil }
         let t = timers.remove(at: i)
@@ -172,12 +172,12 @@ final class TimersPane: NSObject, NSTableViewDataSource, NSTableViewDelegate {
         return t.label.isEmpty ? "Timer done · \(t.lengthText)" : "\(t.label) · \(t.lengthText) timer done"
     }
 
-    // 가장 먼저 끝나는 타이머
+    // The timer that ends first
     func soonest(at now: Date) -> (left: TimeInterval, timer: CountdownTimer)? {
         timers.filter(\.running).map { (left: $0.left(at: now), timer: $0) }.min { $0.left < $1.left }
     }
 
-    // 창이 보이는 동안 매초 남은 시간만 다시 그린다
+    // While the window is visible, redraw just the remaining time every second
     func tick() {
         guard timers.contains(where: \.running), table.numberOfRows > 0 else { return }
         table.reloadData(forRowIndexes: IndexSet(integersIn: 0..<table.numberOfRows), columnIndexes: [0])

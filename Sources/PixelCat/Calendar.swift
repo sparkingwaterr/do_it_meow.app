@@ -1,7 +1,7 @@
 import Cocoa
 
-// 달력 화면의 뼈대: 한 달 달력에 마감이 있는 날을 점으로 찍고, 날짜를 누르면 그날 할 일을 보여 준다.
-// 지금은 앱 안의 할 일만 보여 준다. 나중에 애플 캘린더 일정을 붙일 때는 items 에 그 일정을 더해 주면 된다
+// Calendar screen, bare bones: a month grid with a dot on days that have a reminder; clicking a day lists what is due.
+// For now it only shows this app's to-dos. To add Apple Calendar events later, append them to `items`
 
 struct CalendarItem {
     let date: Date
@@ -10,9 +10,9 @@ struct CalendarItem {
 }
 
 final class MonthView: NSView {
-    var month = Date() { didSet { needsDisplay = true } }      // 보여 줄 달 안의 아무 날
+    var month = Date() { didSet { needsDisplay = true } }      // Any day inside the month being shown
     var selected = Date() { didSet { needsDisplay = true } }
-    var marked: Set<Date> = [] { didSet { needsDisplay = true } }  // 일정이 있는 날 (그날 0시)
+    var marked: Set<Date> = [] { didSet { needsDisplay = true } }  // Days that have items (midnight of that day)
     var onSelect: ((Date) -> Void)?
 
     private let cal = Calendar.current
@@ -21,7 +21,7 @@ final class MonthView: NSView {
     override var isFlipped: Bool { true }
 
     private var firstDay: Date { cal.date(from: cal.dateComponents([.year, .month], from: month)) ?? month }
-    private var offset: Int { cal.component(.weekday, from: firstDay) - 1 }  // 일요일부터 시작
+    private var offset: Int { cal.component(.weekday, from: firstDay) - 1 }  // Weeks start on Sunday
     private var dayCount: Int { cal.range(of: .day, in: .month, for: firstDay)?.count ?? 30 }
     private var cell: NSSize { NSSize(width: bounds.width / 7, height: (bounds.height - headerHeight) / 6) }
 

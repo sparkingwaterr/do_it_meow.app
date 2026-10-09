@@ -1,5 +1,5 @@
 #!/bin/bash
-# 설치한 앱을 지운다. 할 일, 메모, 설정까지 지우려면: ./Installer/uninstall.sh --all
+# Removes the installed app. To also erase to-dos, notes and settings: ./Installer/uninstall.sh --all
 set -e
 
 pkill -x PixelCat 2>/dev/null || true

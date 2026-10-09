@@ -18,7 +18,7 @@ uninstall:
 clean:
 	rm -rf build
 
-# README 에 넣는 앱 화면을 밝은 테마와 어두운 테마로 다시 찍는다 (보기용 예시 데이터 사용)
+# Retake the app screenshots for the README in light and dark, using sample data
 screenshots: build
 	PIXELCAT_SCREENSHOTS="$(CURDIR)/docs/screenshots" $(APP)/Contents/MacOS/PixelCat
 	for f in docs/screenshots/app-*-light.png docs/screenshots/app-*-dark.png; do sips -Z 1100 "$$f" >/dev/null; done

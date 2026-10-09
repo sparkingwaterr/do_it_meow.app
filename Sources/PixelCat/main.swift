@@ -1033,7 +1033,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var bodyHeight: CGFloat { CGFloat(catView.design.rows.count) * catView.px }
     // 앞발을 걸치고 있을 때는 창을 그만큼 내려서 발이 모서리 아래로 나오게 한다
     var peekDrop: CGFloat { catView.inPeek ? CGFloat(pawOverhang) * catView.px : 0 }
-    var idle: Bool { motion == nil && !asleep && !playing && !catView.isBusy && !bubblePanel.isVisible }
+    var idle: Bool { motion == nil && !asleep && !playing && !away && !catView.isBusy && !bubblePanel.isVisible }
+
+    // 공놀이나 알림 때문에 바닥 줄을 떠나 화면 어딘가에 떠 있는 상태. 이때 있는 곳을 바닥으로 저장하면 안 된다
+    var away = false
+    var awayUntil = Date.distantPast  // 이 시각까지는 떠 있는 채로 둔다 (말하는 중)
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let d = UserDefaults.standard
@@ -1256,6 +1260,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // 손으로 끌어다 놓으면 거기가 새 바닥
     func catDragged() {
+        away = false  // 손으로 놓은 곳이 새 바닥
         catView.standUp()
         cancelMotion()
         perch = nil
@@ -1366,7 +1371,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let arrived = left < 0.5
             if arrived || self.catView.isBusy || self.bubblePanel.isVisible {
                 self.cancelMotion()
-                if self.perch == nil { self.saveHome() }
+                if self.perch == nil && !self.away { self.saveHome() }
                 if arrived { done?() }
                 return
             }
@@ -1404,6 +1409,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self else { return }
             if self.catView.pressed {  // 공중에서 붙잡힘
                 self.cancelMotion()
+                self.away = true
                 return
             }
             n += 1
@@ -1413,6 +1419,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if n >= frames {
                 self.cancelMotion()
                 self.perch = landing
+                self.away = false
                 self.sitUpUntil = Date() + 0.6
                 if landing == nil { self.saveHome() }
                 self.catView.hop([1, 2, 1, 0])
@@ -1519,7 +1526,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let roomLeft = cat.minX - screen.minX, roomRight = screen.maxX - cat.maxX
         let x = roomLeft > roomRight ? cat.minX - gap : cat.maxX + gap - bowl.neededSize.width
         bowlPanel.setFrameOrigin(NSPoint(x: min(max(x, screen.minX), screen.maxX - bowl.neededSize.width),
-                                         y: cat.minY + peekDrop))
+                                         y: away ? homeY : cat.minY + peekDrop))
         bowlPanel.orderFrontRegardless()
         log("food placed at \(bowlPanel.frame.origin)")
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in self?.goEat() }
@@ -1527,7 +1534,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // 밥그릇 옆으로 걸어간다 (멀면 뛴다). 점프는 하지 않도록 밥그릇을 고양이가 서 있는 줄로 옮겨 놓는다
     func goEat() {
-        guard hasFood, !playing, motion == nil, !catView.pressed else { return }
+        guard hasFood, !playing, !away, motion == nil, !catView.pressed else { return }
         wake()
         if catView.inPeek {
             catPanel.setFrameOrigin(NSPoint(x: catPanel.frame.minX, y: catPanel.frame.minY + peekDrop))
@@ -1630,6 +1637,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         cancelMotion()
         perch = nil
         playing = true
+        away = true
 
         let size = ballPanel.frame.size
         var pos = ballPanel.frame.origin
@@ -1756,7 +1764,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let screen = (NSScreen.screens.first { $0.frame.contains(NSPoint(x: cat.midX, y: homeY + 1)) }
             ?? NSScreen.main)?.visibleFrame ?? cat
         let target = NSPoint(x: min(max(cat.minX, screen.minX), screen.maxX - cat.width), y: homeY)
-        guard hypot(target.x - cat.minX, target.y - cat.minY) > 1 else { return }
+        guard hypot(target.x - cat.minX, target.y - cat.minY) > 1 else {
+            away = false
+            return
+        }
         cancelMotion()
         var pos = cat.origin
         var tick = 0
@@ -1767,7 +1778,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let dist = hypot(dx, dy)
             if dist < 1 || self.catView.pressed {
                 self.cancelMotion()
-                if !self.catView.pressed { self.saveHome() }
+                if !self.catView.pressed {
+                    self.away = false
+                    self.saveHome()
+                }
                 return
             }
             tick += 1
@@ -1843,7 +1857,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                   let range = self.walkRange, abs(mouse.y - cat.minY) < 500 else {
                 self.cancelMotion()
                 self.lastFollow = Date()
-                if self.perch == nil { self.saveHome() }
+                if self.perch == nil && !self.away { self.saveHome() }
                 return
             }
             let target = min(max(mouse.x - cat.width / 2, range.lowerBound), range.upperBound)
@@ -1889,11 +1903,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func act() {
-        if hasFood {  // 밥이 있으면 다른 건 제쳐두고 먹으러 간다
+        if hasFood && !away {  // 밥이 있으면 다른 건 제쳐두고 먹으러 간다
             goEat()
             return
         }
         if playing { return }
+        if away {  // 어쩌다 공중에 남았으면 제자리로 돌아간다
+            if motion == nil && !catView.pressed && !bubblePanel.isVisible && Date() > awayUntil { runHome() }
+            return
+        }
         if asleep {  // 한 번 잠들면 평균 1~2분쯤 잔다. 집중 시간에는 끝날 때까지 잔다
             if !focusing && Int.random(in: 0..<100) < 10 { wake() }
             return
@@ -2005,7 +2023,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let size = catView.spriteSize
         catPanel.setFrame(NSRect(x: old.midX - size.width / 2, y: old.minY, width: size.width, height: size.height),
                           display: true)
-        if perch == nil { saveHome() }
+        if perch == nil && !away { saveHome() }
         if bubblePanel.isVisible { layoutBubble() }
     }
 
@@ -2184,22 +2202,63 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    // 고양이가 깨어나 화면 가운데로 달려와서 말한다. 소리도 낸다
+    // 소리를 내고, 고양이가 깨어나 마우스 커서가 있는 곳까지 화면을 가로질러 달려와서 말한다
     func comeAndSay(_ text: String) {
         log("announce: \(text)")
         NSSound(named: "Glass")?.play()
         wake()
         if playing { stopPlay() }
-        if eating { cancelMotion() }
-        say(text, force: true, seconds: 9)
-        let run = { [weak self] in
-            guard let self, self.motion == nil,
-                  let screen = (self.catPanel.screen ?? NSScreen.main)?.visibleFrame else { return }
-            let center = screen.midX - self.catPanel.frame.width / 2
-            self.walk(to: center, run: true) { [weak self] in self?.say(text, force: true, seconds: 9) }
-            self.say(text, force: true, seconds: 9)  // 걷기 시작하면서 말풍선이 닫히므로 다시 띄운다
+        if catView.inPeek {
+            catPanel.setFrameOrigin(NSPoint(x: catPanel.frame.minX, y: catPanel.frame.minY + peekDrop))
         }
-        if perch != nil { dropToFloor(then: run) } else if motion == nil { run() }
+        catView.standUp()
+        cancelMotion()
+        perch = nil
+        away = true
+        awayUntil = Date() + 30
+        hideQuip()
+
+        // 커서 바로 아래에 멈춘다. 커서를 가리거나 마우스가 올라간 것으로 치지 않게 조금 띄운다
+        var pos = catPanel.frame.origin
+        var tick = 0
+        catView.running = true
+        let t = Timer(timeInterval: 0.03, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            if self.catView.pressed {
+                self.cancelMotion()
+                return
+            }
+            let mouse = NSEvent.mouseLocation
+            let cat = self.catPanel.frame
+            let screen = (NSScreen.screens.first { $0.frame.contains(mouse) } ?? NSScreen.main)?.visibleFrame ?? cat
+            let target = NSPoint(
+                x: min(max(mouse.x - cat.width / 2, screen.minX), screen.maxX - cat.width),
+                y: min(max(mouse.y - self.bodyHeight - 14, screen.minY), screen.maxY - self.bodyHeight))
+            let dx = target.x - pos.x, dy = target.y - pos.y
+            let dist = hypot(dx, dy)
+            tick += 1
+            if dist < 4 || tick > 500 {  // 다 왔거나, 15초를 쫓아도 못 따라잡으면 그 자리에서 말한다
+                self.cancelMotion()
+                log("arrived at cursor")
+                self.say(text, force: true, seconds: 9)
+                self.awayUntil = Date() + 10
+                DispatchQueue.main.asyncAfter(deadline: .now() + 9.5) { [weak self] in
+                    guard let self, self.motion == nil, !self.playing, !self.catView.pressed, self.perch == nil else { return }
+                    self.runHome()  // 할 말을 다 했으면 제자리로 돌아간다
+                }
+                return
+            }
+            if abs(dx) > 6 { self.catView.facingRight = dx > 0 }
+            let step = min(self.runSpeed * 1.6, dist)
+            pos.x += dx / dist * step
+            pos.y += dy / dist * step
+            self.moveCat(to: pos)
+            let frame = self.stepFrame(tick, run: true)
+            self.catView.walkFrame = frame
+            self.catView.jump = frame == 1 ? 1 : 0
+        }
+        RunLoop.main.add(t, forMode: .common)
+        motion = t
     }
 
     // MARK: Focus timer

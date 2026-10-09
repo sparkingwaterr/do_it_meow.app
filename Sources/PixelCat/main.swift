@@ -453,6 +453,7 @@ final class Store {
     func save() {
         if let data = try? JSONEncoder().encode(todos) {
             UserDefaults.standard.set(data, forKey: key)
+            UserDefaults.standard.synchronize()  // 갑자기 꺼져도 남도록 바로 내려쓴다
         }
     }
 }
@@ -653,6 +654,8 @@ final class BubbleView: NSView, NSTextViewDelegate {
     private let prevNote = NSButton(title: "‹", target: nil, action: nil)
     private let nextNote = NSButton(title: "›", target: nil, action: nil)
     private let addNote = NSButton(title: "+", target: nil, action: nil)
+    private let deleteNote = NSButton(title: "×", target: nil, action: nil)
+    private var confirmDeleteUntil = Date.distantPast  // 이 시각 전에 × 를 한 번 더 누르면 지운다
     private let noteScroll = NSTextView.scrollableTextView()
     private var noteText: NSTextView { noteScroll.documentView as! NSTextView }
     private var dynamic: [NSView] = []  // 다시 그릴 때마다 새로 만드는 것들 (제목, 할 일 줄)
@@ -675,7 +678,8 @@ final class BubbleView: NSView, NSTextViewDelegate {
 
         for (button, action) in [(todoTab, #selector(showTodos)), (memoTab, #selector(showMemos)),
                                  (prevNote, #selector(previousNote)), (nextNote, #selector(followingNote)),
-                                 (addNote, #selector(newNote))] {
+                                 (addNote, #selector(newNote)),
+                                 (deleteNote, #selector(removeNote))] {
             button.isBordered = false
             button.target = self
             button.action = action
@@ -736,12 +740,17 @@ final class BubbleView: NSView, NSTextViewDelegate {
 
         var y = contentTop
         field.isHidden = showsNotes
-        for v in [prevNote, nextNote, addNote, noteScroll] as [NSView] { v.isHidden = !showsNotes }
+        for v in [prevNote, nextNote, addNote, deleteNote, noteScroll] as [NSView] { v.isHidden = !showsNotes }
 
         if showsNotes {
             let all = notes?.notes ?? []
             noteIndex = min(max(noteIndex, 0), max(all.count - 1, 0))
-            heading(all.isEmpty ? "No memos yet" : "Memo \(noteIndex + 1) of \(all.count)", y: y, width: inner - 70)
+            let confirming = Date() < confirmDeleteUntil
+            heading(all.isEmpty ? "No memos yet" : confirming ? "× again: delete" : "Memo \(noteIndex + 1) of \(all.count)",
+                    y: y, width: inner - 92)
+            deleteNote.frame = NSRect(x: Self.width - Self.pad - 88, y: y - 4, width: 20, height: 22)
+            deleteNote.isEnabled = !all.isEmpty
+            deleteNote.contentTintColor = confirming ? colors["R"] : NSColor(white: 0.6, alpha: 1)
             addNote.frame = NSRect(x: Self.width - Self.pad - 20, y: y - 3, width: 20, height: 22)
             nextNote.frame = NSRect(x: Self.width - Self.pad - 42, y: y - 4, width: 20, height: 22)
             prevNote.frame = NSRect(x: Self.width - Self.pad - 64, y: y - 4, width: 20, height: 22)
@@ -812,6 +821,20 @@ final class BubbleView: NSView, NSTextViewDelegate {
         noteIndex = 0
         onChange?()
         window?.makeFirstResponder(noteText)
+    }
+
+    // 실수로 지우지 않게 두 번 눌러야 지워진다
+    @objc func removeNote() {
+        if Date() < confirmDeleteUntil {
+            confirmDeleteUntil = .distantPast
+            notes?.delete(at: noteIndex)
+            shownNote = nil
+            onChange?()
+        } else {
+            confirmDeleteUntil = Date() + 3
+            onChange?()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.1) { [weak self] in self?.onChange?() }
+        }
     }
 
     func textDidChange(_ notification: Notification) {
@@ -1037,6 +1060,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // 공놀이나 알림 때문에 바닥 줄을 떠나 화면 어딘가에 떠 있는 상태. 이때 있는 곳을 바닥으로 저장하면 안 된다
     var away = false
+    var ringing = false
+    var ringTimer: Timer?
+    var ringToken = 0
     var awayUntil = Date.distantPast  // 이 시각까지는 떠 있는 채로 둔다 (말하는 중)
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -1062,7 +1088,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         configure(catPanel)
         catView.onClick = { [weak self] clicks in
             guard let self else { return }
-            if self.asleep {
+            if self.ringing {  // 울리는 중이면 클릭은 소리 끄기
+                self.stopRinging()
+            } else if self.asleep {
                 if clicks >= 2 { self.wake() }  // 자는 고양이는 더블클릭해야 깬다
             } else if clicks == 1 {
                 self.toggleBubble()
@@ -1162,6 +1190,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if env["PIXELCAT_TEST_BALL"] != nil { self?.toggleBall() }
             if env["PIXELCAT_TEST_FOOD"] != nil { self?.putFood() }
             if env["PIXELCAT_TEST_REMIND"] != nil { self?.comeAndSay("Time for: test reminder") }
+            if env["PIXELCAT_TEST_DUE"] != nil {
+                log("set due via popover path: \(self?.hub.testSetDue(after: 6) ?? false)")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 22) {  // 시험이 끝나면 원래대로
+                    self?.stopRinging()
+                    if self?.store.todos.isEmpty == false {
+                        self?.store.todos[0].due = nil
+                        self?.store.todos[0].notified = nil
+                    }
+                    log("test due cleared")
+                }
+            }
+            if env["PIXELCAT_TEST_TIMER"] != nil {  // 5초짜리 타이머를 돌려 본다
+                self?.hub.timersPane.start(seconds: 5, label: "__test")
+                log("test timer started")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 14) {
+                    self?.stopRinging()
+                    log("test over, timers left: \(self?.hub.timersPane.timers.count ?? -1)")
+                }
+            }
         }
     }
 
@@ -2065,7 +2112,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         seconds += 1
         watchMouse()
         focusTick()
-        if seconds % 15 == 0 { checkDue() }
+        if seconds % 5 == 0 { checkDue() }
+        if let text = hub.timersPane.fire(at: Date()) { ring(text) }
         if seconds % 60 == 0 {
             hunger = min(100, hunger + 100.0 / 600)  // 열 시간이면 완전히 배고파진다
             saveHunger()
@@ -2197,13 +2245,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let t = store.todos[i]
             guard !t.done, t.notified != true, let due = t.due, due <= now else { continue }
             store.todos[i].notified = true
-            comeAndSay("Time for: \(t.text)")
+            ring("Time for: \(t.text)")
             return  // 한 번에 하나씩
         }
     }
 
     // 소리를 내고, 고양이가 깨어나 마우스 커서가 있는 곳까지 화면을 가로질러 달려와서 말한다
-    func comeAndSay(_ text: String) {
+    func comeAndSay(_ text: String, hold: Double = 9) {
         log("announce: \(text)")
         NSSound(named: "Glass")?.play()
         wake()
@@ -2215,7 +2263,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         cancelMotion()
         perch = nil
         away = true
-        awayUntil = Date() + 30
+        awayUntil = Date() + 30 + hold
         hideQuip()
 
         // 커서 바로 아래에 멈춘다. 커서를 가리거나 마우스가 올라간 것으로 치지 않게 조금 띄운다
@@ -2240,10 +2288,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if dist < 4 || tick > 500 {  // 다 왔거나, 15초를 쫓아도 못 따라잡으면 그 자리에서 말한다
                 self.cancelMotion()
                 log("arrived at cursor")
-                self.say(text, force: true, seconds: 9)
-                self.awayUntil = Date() + 10
-                DispatchQueue.main.asyncAfter(deadline: .now() + 9.5) { [weak self] in
-                    guard let self, self.motion == nil, !self.playing, !self.catView.pressed, self.perch == nil else { return }
+                self.say(text, force: true, seconds: hold)
+                self.awayUntil = Date() + hold + 1
+                let token = self.ringToken
+                DispatchQueue.main.asyncAfter(deadline: .now() + hold + 0.5) { [weak self] in
+                    guard let self, self.ringToken == token, !self.ringing, self.motion == nil, !self.playing,
+                          !self.catView.pressed, self.perch == nil else { return }
                     self.runHome()  // 할 말을 다 했으면 제자리로 돌아간다
                 }
                 return
@@ -2259,6 +2309,47 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         RunLoop.main.add(t, forMode: .common)
         motion = t
+    }
+
+    // MARK: Ringing
+
+    // 타이머와 마감 알림: 고양이가 커서로 달려오고, 고양이를 클릭할 때까지(길어야 1분) 소리가 되풀이된다
+    func ring(_ text: String) {
+        log("ring: \(text)")
+        stopRinging(returnHome: false)
+        ringing = true
+        ringToken += 1
+        let token = ringToken
+        var count = 0
+        let t = Timer(timeInterval: 2.2, repeats: true) { [weak self] _ in
+            guard let self, self.ringToken == token else { return }
+            count += 1
+            if count >= 27 {
+                self.stopRinging()
+            } else {
+                NSSound(named: "Glass")?.play()
+            }
+        }
+        RunLoop.main.add(t, forMode: .common)
+        ringTimer = t
+        comeAndSay(text, hold: 60)  // 첫 소리는 여기서 난다
+        hub.refresh()
+    }
+
+    @objc func stopRinging(returnHome: Bool = true) {
+        guard ringing else { return }
+        log("ring stopped")
+        ringing = false
+        ringToken += 1
+        ringTimer?.invalidate()
+        ringTimer = nil
+        hideQuip()
+        awayUntil = .distantPast
+        if returnHome && away && !playing && !catView.pressed {
+            cancelMotion()
+            runHome()
+        }
+        hub.refresh()
     }
 
     // MARK: Focus timer
@@ -2459,6 +2550,14 @@ if let i = args.firstIndex(of: "--render"), i + 1 < args.count {
     b.rebuild()
     writePNG(b, dir + "/bubble-memo.png")
 } else {
+    // 종료 신호를 받으면 그냥 죽지 않고 저장을 마친 뒤 끝낸다
+    signal(SIGTERM, SIG_IGN)
+    let termination = DispatchSource.makeSignalSource(signal: SIGTERM, queue: .main)
+    termination.setEventHandler {
+        UserDefaults.standard.synchronize()
+        NSApp.terminate(nil)
+    }
+    termination.resume()
     let delegate = AppDelegate()
     app.delegate = delegate
     app.setActivationPolicy(.accessory)

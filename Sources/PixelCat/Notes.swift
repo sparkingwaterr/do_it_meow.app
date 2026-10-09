@@ -37,6 +37,7 @@ final class NotesPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NST
 
     private func save() {
         if let data = try? JSONEncoder().encode(notes) { UserDefaults.standard.set(data, forKey: "notes") }
+        UserDefaults.standard.synchronize()  // 갑자기 꺼져도 남도록 바로 내려쓴다
     }
 
     private func build() {
@@ -126,14 +127,20 @@ final class NotesPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NST
     }
 
     @objc private func deleteNote() {
-        let row = table.selectedRow
+        delete(at: table.selectedRow)
+        onChange?()
+    }
+
+    func delete(at row: Int) {
         guard notes.indices.contains(row) else { return }
+        let wasSelected = table.selectedRow
         notes.remove(at: row)
         save()
         table.reloadData()
-        if !notes.isEmpty { table.selectRowIndexes([min(row, notes.count - 1)], byExtendingSelection: false) }
+        if !notes.isEmpty {
+            table.selectRowIndexes([min(max(wasSelected, 0), notes.count - 1)], byExtendingSelection: false)
+        }
         showSelection()
-        onChange?()
     }
 
     func numberOfRows(in tableView: NSTableView) -> Int { notes.count }

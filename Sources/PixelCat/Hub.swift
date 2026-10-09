@@ -154,10 +154,15 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
 
     var loginNote = ""
     let notesPane = NotesPane()
+    let timersPane = TimersPane()
+    // 달력에는 마감 시간이 있는 할 일을 올린다
+    lazy var calendarPane = CalendarPane { [unowned self] in
+        self.app.store.todos.compactMap { t in t.due.map { CalendarItem(date: $0, title: t.text, done: t.done) } }
+    }
     let english = Locale(identifier: "en_US")  // 화면 글자가 영어라서 날짜도 영어로 맞춘다
 
-    static let pageNames = ["Overview", "To-Dos", "Notes", "Focus", "Cat", "Settings"]
-    static let pageIcons = ["square.grid.2x2", "checklist", "note.text", "timer", "pawprint", "gearshape"]
+    static let pageNames = ["Overview", "To-Dos", "Notes", "Timers", "Calendar", "Focus", "Cat", "Settings"]
+    static let pageIcons = ["square.grid.2x2", "checklist", "note.text", "hourglass", "calendar", "timer", "pawprint", "gearshape"]
     static let focusChoices = [15, 25, 45, 60]
     static let breakChoices = [5, 10, 15]
 
@@ -170,6 +175,8 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
         statusMenu.delegate = self
         item.menu = statusMenu
         statusItem = item
+        timersPane.onTest = { [unowned self] in self.app.ring("Test ring") }
+        timersPane.onChange = { [unowned self] in self.refresh() }
         installMainMenu()
         installHotKey()
         NotificationCenter.default.addObserver(self, selector: #selector(quickAdd),
@@ -252,11 +259,12 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
             content.trailingAnchor.constraint(equalTo: root.trailingAnchor),
         ])
 
-        pages = [buildOverview(), buildTodos(), notesPane.view, buildFocus(), buildCat(), buildSettings()]
+        pages = [buildOverview(), buildTodos(), notesPane.view, timersPane.view, calendarPane.view,
+                 buildFocus(), buildCat(), buildSettings()]
         for (i, page) in pages.enumerated() {
             page.translatesAutoresizingMaskIntoConstraints = false
             content.addSubview(page)
-            let stretch = i == 1 || i == 2  // 할 일 표와 메모만 창 크기를 따라 늘어난다
+            let stretch = (1...4).contains(i)  // 할 일, 메모, 타이머, 달력은 창 크기를 따라 늘어난다
             NSLayoutConstraint.activate([
                 page.topAnchor.constraint(equalTo: content.topAnchor, constant: 40),
                 page.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 28),
@@ -556,7 +564,10 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
     // 한 초마다 불린다. 창이 안 보이면 상태 아이콘만 고친다
     func tick() {
         updateStatusTitle()
-        if window?.isVisible == true { refresh() }
+        if window?.isVisible == true {
+            refresh()
+            if current == 3 { timersPane.tick() }
+        }
     }
 
     private func clock(_ t: TimeInterval) -> String {
@@ -566,8 +577,10 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
 
     private func updateStatusTitle() {
         let left = app.store.todos.filter { !$0.done }.count
-        let text = app.focusEnds != nil ? clock(app.focusLeft) : left > 0 ? "\(left)" : ""
-        statusItem?.button?.title = text.isEmpty ? "🐱" : "🐱 " + text
+        // 집중 타이머가 돌면 그 시간을, 아니면 가장 먼저 끝나는 타이머를, 그것도 없으면 남은 할 일 수를 보여 준다
+        let text = app.focusEnds != nil ? clock(app.focusLeft)
+            : timersPane.soonest(at: Date()).map { CountdownTimer.clock($0.left) } ?? (left > 0 ? "\(left)" : "")
+        statusItem?.button?.title = app.ringing ? "🐱 ⏰" : text.isEmpty ? "🐱" : "🐱 " + text
     }
 
     private func dueText(_ date: Date) -> String {
@@ -623,8 +636,11 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
         }
 
         let upcoming = todos.filter { !$0.done && $0.due != nil }.sorted { $0.due! < $1.due! }.prefix(3)
-        set("ov.next", upcoming.isEmpty ? "No reminders set.\nUse the clock button on a to-do."
-            : upcoming.map { "\($0.due! < Date() ? "Overdue" : dueText($0.due!)) — \($0.text)" }.joined(separator: "\n"))
+        var lines = upcoming.map { "\($0.due! < Date() ? "Overdue" : dueText($0.due!)) — \($0.text)" }
+        if let soon = timersPane.soonest(at: Date()) {
+            lines.append("Timer: \(CountdownTimer.clock(soon.left)) left\(soon.timer.label.isEmpty ? "" : " — " + soon.timer.label)")
+        }
+        set("ov.next", lines.isEmpty ? "No reminders or timers set." : lines.joined(separator: "\n"))
 
         // 고양이
         let mood = app.mood
@@ -699,6 +715,7 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
         let todos = app.store.todos
         visible = todos.indices.filter { filter == 0 || (filter == 1 && todos[$0].isToday) || (filter == 2 && !todos[$0].done) }
         table?.reloadData()
+        if window != nil { calendarPane.reload() }
         refresh()
     }
 
@@ -927,6 +944,7 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
             item.target = target
             return item
         }
+        if app.ringing { _ = add("Stop Ringing", #selector(AppDelegate.stopRinging), target: app) }
         _ = add("Open Pixel Cat", #selector(showFromMenu), target: self)
         _ = add("New To-Do…", #selector(quickAdd), target: self)
         _ = add("New Note", #selector(newNote), target: self)
@@ -1037,7 +1055,7 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
     }
 
     @objc private func menuPage(_ sender: NSMenuItem) { show(page: sender.tag) }
-    @objc private func showSettings() { show(page: 5) }
+    @objc private func showSettings() { show(page: 7) }
 
     @objc private func newNote() {
         show(page: 2)
@@ -1114,6 +1132,17 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
             return true
         }
         return false
+    }
+
+    // 시험용: 첫 할 일의 ⏰ 를 누르고 몇 초 뒤로 정한 다음 Set 을 누른 것과 같은 경로를 탄다
+    func testSetDue(after seconds: TimeInterval) -> Bool {
+        show(page: 1)
+        guard let t = table, t.numberOfRows > 0,
+              let button = t.view(atColumn: 2, row: 0, makeIfNecessary: true) as? NSButton else { return false }
+        showDue(button)
+        duePicker?.dateValue = Date().addingTimeInterval(seconds)
+        dueSet()
+        return app.store.todos.first?.due != nil
     }
 
     // MARK: Snapshots (모양 확인용)

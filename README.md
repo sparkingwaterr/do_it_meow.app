@@ -6,7 +6,7 @@ A pixel cat that lives on your Mac desktop and keeps your to-dos.
 
 - Click the cat for a speech bubble with your to-dos and memos.
 - It wanders, climbs onto windows and peeks over them, naps in a nightcap, eats, and chases a yarn ball.
-- The app window has an overview with a completion ring, to-dos with reminders, notes, a focus timer, and settings.
+- The app window has an overview with a completion ring, to-dos with reminders, notes, timers, a calendar, a focus timer, and settings.
 
 ![Overview](docs/screenshots/app-overview.png)
 
@@ -34,6 +34,8 @@ make clean   # delete build/
 | `Sources/PixelCat/main.swift` | The cat, its sprites and behaviour, the speech bubble |
 | `Sources/PixelCat/Hub.swift` | The app window, menu bar, status item, quick add |
 | `Sources/PixelCat/Notes.swift` | Notes |
+| `Sources/PixelCat/Timers.swift` | Countdown timers |
+| `Sources/PixelCat/Calendar.swift` | Month calendar of to-do reminders |
 | `Resources/Info.plist` | App bundle metadata |
 | `Scripts/build.sh` | Builds `build/PixelCat.app` with its icon |
 | `Installer/` | Install and uninstall scripts |

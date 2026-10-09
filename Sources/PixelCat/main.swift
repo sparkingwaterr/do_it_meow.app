@@ -172,7 +172,7 @@ final class CatView: NSView {
     var running = false { didSet { needsDisplay = true } }  // true 면 다리를 내고 뜀
     var dip = 0 { didSet { needsDisplay = true } }  // 밥 먹을 때 몸을 숙이는 칸 수
     var asleep = false { didSet { needsDisplay = true } }
-    var isPreview = false  // 보여 주기만 하는 고양이 (앱 창의 미리보기, 새끼 고양이). 마우스에 반응하지 않는다
+    var isPreview = false  // 보여 주기만 하는 고양이 (앱 창의 미리보기). 마우스에 반응하지 않는다
 
     override func hitTest(_ point: NSPoint) -> NSView? { isPreview ? nil : super.hitTest(point) }
 
@@ -1083,7 +1083,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var away = false
     var ringing = false
     var jumping = false
-    var kitten: Kitten!
     var ringTimer: Timer?
     var ringToken = 0
     var awayUntil = Date.distantPast  // 이 시각까지는 떠 있는 채로 둔다 (말하는 중)
@@ -1199,8 +1198,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if d.object(forKey: "focusMinutes") != nil { focusMinutes = max(1, d.integer(forKey: "focusMinutes")) }
         if d.object(forKey: "breakMinutes") != nil { breakMinutes = max(1, d.integer(forKey: "breakMinutes")) }
         hub = Hub(app: self)
-        kitten = Kitten(app: self)
-        kitten.setEnabled(d.object(forKey: "kitten") == nil || d.bool(forKey: "kitten"))
         bubble.notes = hub.notesPane
         hub.notesPane.onChange = { [weak self] in
             guard let self, self.bubblePanel.isVisible, self.bubble.showsNotes else { return }
@@ -2063,9 +2060,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(withTitle: ballPanel.isVisible ? "Put Away Yarn Ball" : "Throw Yarn Ball",
                      action: #selector(toggleBall), keyEquivalent: "").target = self
         menu.addItem(withTitle: asleep ? "Wake Up" : "Put to Sleep", action: #selector(toggleSleep), keyEquivalent: "").target = self
-        let kit = menu.addItem(withTitle: "Kitten", action: #selector(toggleKitten), keyEquivalent: "")
-        kit.target = self
-        kit.state = kitten.enabled ? .on : .off
         let wander = menu.addItem(withTitle: "Wander Around", action: #selector(toggleWander), keyEquivalent: "")
         wander.target = self
         wander.state = wanderOn ? .on : .off
@@ -2194,12 +2188,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func toggleTodoBubble() {
         toggleBubble()
-        hub.refresh()
-    }
-
-    @objc func toggleKitten() {
-        kitten.setEnabled(!kitten.enabled)
-        UserDefaults.standard.set(kitten.enabled, forKey: "kitten")
         hub.refresh()
     }
 
@@ -2535,7 +2523,7 @@ if let i = args.firstIndex(of: "--icon"), i + 1 < args.count {
 if let i = args.firstIndex(of: "--render"), i + 1 < args.count {
     // 창을 띄우지 않고 그림만 PNG로 저장 (모양 확인용)
     let dir = args[i + 1]
-    for (n, design) in (designs + [kittenDesign]).enumerated() {
+    for (n, design) in designs.enumerated() {
         let cat = CatView(frame: .zero)
         cat.design = design
         cat.px = 12

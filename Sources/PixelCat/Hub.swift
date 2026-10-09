@@ -176,6 +176,8 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusMenu.delegate = self
         item.menu = statusMenu
+        item.button?.image = Self.menuBarIcon()
+        item.button?.imagePosition = .imageLeading
         statusItem = item
         timersPane.onTest = { [unowned self] in self.app.ring("Test ring") }
         timersPane.onChange = { [unowned self] in self.refresh() }
@@ -184,6 +186,35 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
         NotificationCenter.default.addObserver(self, selector: #selector(quickAdd),
                                                name: Notification.Name("PixelCatHotKey"), object: nil)
         updateStatusTitle()
+    }
+
+    // 메뉴 막대 아이콘: 작은 고양이를 선으로만 그린 그림. 테두리, 무늬, 눈, 코만 칠하고 흰 털은 비워 두어서
+    // 밝은 메뉴 막대에서는 검게, 어두운 메뉴 막대에서는 희게 저절로 바뀐다
+    static let menuBarCat = [
+        ".KK...KK.....",
+        "KBBK.KWWK....",
+        "KBBBKWWWKKK..",
+        "KBBWWWWWWBWK.",
+        "KWWEWWWEWBBWK",
+        "KWWeWPWeWWWWK",
+        "KWWWWWWWWWBBK",
+        ".KKKKKKKKKKK.",
+    ]
+
+    static func menuBarIcon() -> NSImage {
+        let unit: CGFloat = 2
+        let size = NSSize(width: CGFloat(menuBarCat[0].count) * unit, height: CGFloat(menuBarCat.count) * unit)
+        let image = NSImage(size: size, flipped: true) { _ in
+            NSColor.black.setFill()
+            for (y, row) in menuBarCat.enumerated() {
+                for (x, ch) in row.enumerated() where ch != "." && ch != "W" {
+                    NSRect(x: CGFloat(x) * unit, y: CGFloat(y) * unit, width: unit, height: unit).fill()
+                }
+            }
+            return true
+        }
+        image.isTemplate = true
+        return image
     }
 
     // MARK: Window
@@ -545,7 +576,6 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
             caption("Appearance"),
             hstack([fixed(label("Look"), width: 60), keyed("cp.look", look)]),
             hstack([fixed(label("Size"), width: 60), keyed("cp.size", size)]),
-            keyed("cp.kitten", check("A kitten follows the cat around", #selector(AppDelegate.toggleKitten))),
             caption("Play"),
             hstack([button("Put Out Food", #selector(AppDelegate.putFood)),
                     keyed("cp.ball", button("Throw Yarn Ball", #selector(AppDelegate.toggleBall))),
@@ -612,7 +642,7 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
         // 집중 타이머가 돌면 그 시간을, 아니면 가장 먼저 끝나는 타이머를, 그것도 없으면 남은 할 일 수를 보여 준다
         let text = app.focusEnds != nil ? clock(app.focusLeft)
             : timersPane.soonest(at: Date()).map { CountdownTimer.clock($0.left) } ?? (left > 0 ? "\(left)" : "")
-        statusItem?.button?.title = app.ringing ? "🐱 ⏰" : text.isEmpty ? "🐱" : "🐱 " + text
+        statusItem?.button?.title = app.ringing ? " ⏰" : text.isEmpty ? "" : " " + text
     }
 
     private func dueText(_ date: Date) -> String {
@@ -685,7 +715,6 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
         (controls["ov.ball"] as? NSButton)?.title = ballTitle
         (controls["cp.ball"] as? NSButton)?.title = ballTitle
         (controls["cp.sleep"] as? NSButton)?.title = app.asleep ? "Wake Up" : "Put to Sleep"
-        (controls["cp.kitten"] as? NSButton)?.state = app.kitten?.enabled == true ? .on : .off
         (controls["cp.climb"] as? NSButton)?.isEnabled = app.perch == nil
         (controls["cp.down"] as? NSButton)?.isEnabled = app.perch != nil
         let bubbleTitle = app.bubblePanel.isVisible ? "Hide on Cat" : "Show on Cat"

@@ -947,6 +947,20 @@ func visibleWindows() -> [Win] {
     }
 }
 
+// 맥북 화면 위쪽 가운데의 노치(카메라 자리)가 가리는 가로 범위.
+// 바닥 높이 y 에 키 height 인 것이 메뉴 막대 높이까지 올라올 때만 값이 있다
+func notchRange(atY y: CGFloat, height: CGFloat) -> ClosedRange<CGFloat>? {
+    for screen in NSScreen.screens where screen.safeAreaInsets.top > 0 {
+        guard let left = screen.auxiliaryTopLeftArea, let right = screen.auxiliaryTopRightArea,
+              y < screen.frame.maxY, y + height > screen.frame.maxY - screen.safeAreaInsets.top else { continue }
+        let width = screen.frame.width - left.width - right.width
+        guard width > 0 else { continue }
+        let margin: CGFloat = 8  // 노치 가장자리에 바짝 붙지 않게
+        return (screen.frame.midX - width / 2 - margin)...(screen.frame.midX + width / 2 + margin)
+    }
+    return nil
+}
+
 // 고양이가 올라앉은 창
 struct Perch {
     let id: CGWindowID
@@ -1279,7 +1293,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard motion == nil else { return }
 
         let catW = catPanel.frame.width
-        let x = min(max(f.minX + p.offsetX, f.minX), max(f.minX, f.maxX - catW))
+        var x = min(max(f.minX + p.offsetX, f.minX), max(f.minX, f.maxX - catW))
+        // 창이 움직여서 노치 밑으로 들어가게 되면 가까운 쪽 옆으로 비켜 앉는다
+        if let notch = notchRange(atY: f.maxY, height: bodyHeight), x + catW > notch.lowerBound, x < notch.upperBound {
+            let goLeft = x + catW / 2 < (notch.lowerBound + notch.upperBound) / 2
+            x = goLeft ? notch.lowerBound - catW : notch.upperBound
+            perch?.offsetX = x - f.minX
+        }
         let foot = NSPoint(x: x + catW / 2, y: f.maxY - 2)
         let onScreen = NSScreen.screens.contains { $0.frame.contains(NSPoint(x: foot.x, y: f.maxY + bodyHeight - 1)) }
         if !onScreen || wins[..<i].contains(where: { $0.frame.contains(foot) }) {
@@ -1422,8 +1442,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let screen = full.visibleFrame
         let lo = max(w.minX, screen.minX), hi = min(w.maxX, screen.maxX) - catW
         guard hi > lo else { return nil }
-        for _ in 0..<8 {
+        let notch = notchRange(atY: w.maxY, height: bodyHeight)
+        for _ in 0..<12 {
             let x = CGFloat.random(in: lo...hi)
+            if let notch = notch, x + catW > notch.lowerBound, x < notch.upperBound { continue }  // 노치 밑은 피한다
             let foot = NSPoint(x: x + catW / 2, y: w.maxY - 2)
             if !wins[..<i].contains(where: { $0.frame.contains(foot) }) { return NSPoint(x: x, y: w.maxY) }
         }

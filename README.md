@@ -136,11 +136,12 @@ How much is done, your streak, the last 7 days, the cat's mood, and what is comi
 
 ### Download
 
-1. Get `PixelCat-<version>.zip` from the [latest release](https://github.com/sparkingwaterr/do_it_meow.app/releases/latest) and unzip it.
-2. Move `PixelCat.app` to your Applications folder.
-3. The app is not notarized by Apple, so the first launch is blocked. Open **System Settings → Privacy & Security**, scroll down, and press **Open Anyway**. On older macOS versions, right-click the app and choose **Open** instead.
+1. Get `PixelCat-<version>.dmg` from the [latest release](https://github.com/sparkingwaterr/do_it_meow.app/releases/latest), open it, and drag **PixelCat** onto **Applications**.
+2. Open it from Applications. The app is not notarized by Apple, so the first launch is blocked: open **System Settings → Privacy & Security**, scroll down, and press **Open Anyway**. On older macOS versions, right-click the app and choose **Open** instead.
 
 Requires macOS 13 or later. Runs on Apple silicon and Intel Macs.
+
+After that the app keeps itself up to date: it checks for a new release once a day and offers to install it. You can also choose **Check for Updates…** from the paw menu.
 
 ### Build from source
 
@@ -156,14 +157,16 @@ This builds the app, copies it to `/Applications`, and opens it. To install some
 
 ## Privacy
 
-Everything stays on your Mac. To-dos, notes, timers, and settings are saved in the app's own preferences. To sit on windows the cat reads where other windows are on screen, never their titles or contents. Nothing is sent anywhere.
+Everything stays on your Mac. To-dos, notes, timers, and settings are saved in the app's own preferences. To sit on windows the cat reads where other windows are on screen, never their titles or contents.
+
+The only time the app goes online is the update check, a request to GitHub for the latest release, once a day. It sends nothing about you or your data, and you can turn it off in Settings.
 
 ## Develop
 
 ```bash
 make run          # build into build/ and launch
 make screenshots  # retake the README screenshots in light and dark with sample data
-make release      # zip the app into build/ for a GitHub release
+make release      # package a zip and dmg into build/ (see docs/RELEASING.md)
 make clean        # delete build/
 ```
 
@@ -174,7 +177,11 @@ make clean        # delete build/
 | `Sources/PixelCat/Notes.swift` | Notes |
 | `Sources/PixelCat/Timers.swift` | Countdown timers |
 | `Sources/PixelCat/Calendar.swift` | Month calendar of to-do reminders |
+| `Sources/PixelCat/Updater.swift` | Checks GitHub for a newer release and installs it |
 | `Resources/Info.plist` | App bundle metadata |
 | `Scripts/build.sh` | Builds `build/PixelCat.app` with its icon |
+| `Scripts/package.sh` | Makes the zip and dmg for a release |
+| `.github/workflows/` | Build check on every push, and the release pipeline on version tags |
+| `CHANGELOG.md`, `docs/RELEASING.md` | What changed, and how to cut a release |
 | `Installer/` | Install and uninstall scripts |
 | `docs/screenshots/` | Pictures used in this README. `app-*-light.png` and `app-*-dark.png` come from `make screenshots` |

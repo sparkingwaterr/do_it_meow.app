@@ -10,6 +10,7 @@ for dir in /Applications "$HOME/Applications"; do
     fi
 done
 if [ "$1" = "--all" ]; then
+    defaults delete io.github.sparkingwaterr.pixelcat 2>/dev/null || true
     defaults delete local.pixelcat 2>/dev/null || true
     echo "removed saved to-dos, notes and settings"
 fi

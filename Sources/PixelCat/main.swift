@@ -434,6 +434,18 @@ final class CatView: NSView {
 let demoMode = ProcessInfo.processInfo.environment["PIXELCAT_SCREENSHOTS"] != nil
     || ProcessInfo.processInfo.environment["PIXELCAT_DEMO"] != nil
 
+// Versions before 2.1 saved everything under the bundle identifier "local.pixelcat". Copy that over once,
+// leaving the old data where it is
+func migrateLegacyDefaults() {
+    let d = UserDefaults.standard, legacy = "local.pixelcat"
+    guard Bundle.main.bundleIdentifier != legacy, !d.bool(forKey: "migratedLegacyDefaults"),
+          let old = d.persistentDomain(forName: legacy), !old.isEmpty else { return }
+    for (key, value) in old where d.object(forKey: key) == nil { d.set(value, forKey: key) }
+    d.set(true, forKey: "migratedLegacyDefaults")
+    d.synchronize()
+    log("copied \(old.count) saved values from \(legacy)")
+}
+
 // MARK: - Todos
 
 struct Todo: Codable {
@@ -1093,6 +1105,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var away = false
     var ringing = false
     var jumping = false
+    let updater = Updater()
     var ringTimer: Timer?
     var ringToken = 0
     var awayUntil = Date.distantPast  // Stay away until this time (still talking)
@@ -1209,6 +1222,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if d.object(forKey: "breakMinutes") != nil { breakMinutes = max(1, d.integer(forKey: "breakMinutes")) }
         if demoMode { hunger = 22 }
         hub = Hub(app: self)
+        updater.start()
         bubble.notes = hub.notesPane
         hub.notesPane.onChange = { [weak self] in
             guard let self, self.bubblePanel.isVisible, self.bubble.showsNotes else { return }
@@ -1216,52 +1230,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         hub.install()
 
-        // Lets tests follow exactly the same path as choosing the menu item
-        let env = ProcessInfo.processInfo.environment
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
-            if let dir = env["PIXELCAT_SCREENSHOTS"] { self?.hub.snapshotAll(to: dir) { exit(0) } }
-            if env["PIXELCAT_TEST_BALL"] != nil { self?.toggleBall() }
-            if env["PIXELCAT_TEST_FOOD"] != nil { self?.putFood() }
-            if env["PIXELCAT_TEST_ADD"] != nil {
-                let before = self?.store.todos.count ?? 0
-                self?.hub.testBlankRow("First") { ok1 in
-                    self?.hub.testBlankRow("Second") { ok2 in
-                        log("blank row: added \((self?.store.todos.count ?? 0) - before), cursor back in blank row: \(ok1 && ok2), last: \(self?.store.todos.last?.text ?? "")")
-                    }
-                }
-            }
-            if env["PIXELCAT_TEST_PEEK"] != nil {  // climb a window, open the bubble, and see whether the cat keeps hanging
-                self?.climbWindow()
-                DispatchQueue.main.asyncAfter(deadline: .now() + 8) {
-                    let before = self?.catView.inPeek ?? false
-                    log("peek state: perch \(self?.perch != nil) motion \(self?.motion != nil) sink \(self?.catView.sink ?? -1) target \(self?.catView.sinkTarget ?? -1) food \(self?.hasFood ?? false) away \(self?.away ?? false) jumping \(self?.jumping ?? false)")
-                    log("bubble visible before toggle: \(self?.bubblePanel.isVisible ?? false)")
-                    self?.toggleBubble()
-                    log("right after toggle: \(self?.bubblePanel.isVisible ?? false) frame \(self?.bubblePanel.frame ?? .zero)")
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                        log("peek test: hanging before \(before), bubble open \(self?.bubblePanel.isVisible ?? false), still hanging \(self?.catView.inPeek ?? false)")
-                    }
-                }
-            }
-            if env["PIXELCAT_TEST_REMIND"] != nil { self?.comeAndSay("Time for: test reminder") }
-            if env["PIXELCAT_TEST_DUE"] != nil {
-                log("set due via popover path: \(self?.hub.testSetDue(after: 6) ?? false)")
-                DispatchQueue.main.asyncAfter(deadline: .now() + 22) {  // Put things back once the test is over
-                    self?.stopRinging()
-                    if self?.store.todos.isEmpty == false {
-                        self?.store.todos[0].due = nil
-                        self?.store.todos[0].notified = nil
-                    }
-                    log("test due cleared")
-                }
-            }
-            if env["PIXELCAT_TEST_TIMER"] != nil {  // Run a five-second timer
-                self?.hub.timersPane.start(seconds: 5, label: "__test")
-                log("test timer started")
-                DispatchQueue.main.asyncAfter(deadline: .now() + 14) {
-                    self?.stopRinging()
-                    log("test over, timers left: \(self?.hub.timersPane.timers.count ?? -1)")
-                }
+        // `make screenshots` runs the app with this set: capture every screen, then quit
+        if let dir = ProcessInfo.processInfo.environment["PIXELCAT_SCREENSHOTS"] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
+                self?.hub.snapshotAll(to: dir) { exit(0) }
             }
         }
     }
@@ -1312,7 +1284,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if bubblePanel.isVisible {
             guard force else { return }
             bubblePanel.orderOut(nil)
-            log("bubble closed to say: \(text)")
         }
         sitUpUntil = max(sitUpUntil, Date() + seconds + 0.2)
         quip.showsHeart = false
@@ -2221,6 +2192,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         dropToFloor()
     }
 
+    @objc func checkForUpdates() { updater.check(userInitiated: true) }
+
+    @objc func toggleAutoUpdate() {
+        updater.automatic.toggle()
+        hub.refresh()
+    }
+
+    @objc func showAbout() {
+        NSApp.activate(ignoringOtherApps: true)
+        let link = NSMutableAttributedString(string: "github.com/\(Updater.repository)")
+        link.addAttributes([.link: URL(string: "https://github.com/\(Updater.repository)")!,
+                            .font: NSFont.systemFont(ofSize: 11)], range: NSRange(location: 0, length: link.length))
+        NSApp.orderFrontStandardAboutPanel(options: [.credits: link])
+    }
+
     @objc func toggleTodoBubble() {
         toggleBubble()
         hub.refresh()
@@ -2642,6 +2628,7 @@ if let i = args.firstIndex(of: "--render"), i + 1 < args.count {
         NSApp.terminate(nil)
     }
     termination.resume()
+    migrateLegacyDefaults()
     let delegate = AppDelegate()
     app.delegate = delegate
     app.setActivationPolicy(.accessory)

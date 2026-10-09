@@ -13,6 +13,9 @@ for arch in arm64 x86_64; do
 done
 lipo -create "$TMP/PixelCat-arm64" "$TMP/PixelCat-x86_64" -output "$APP/Contents/MacOS/PixelCat"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
+# Build number: the number of commits, so every build from a newer commit counts as newer
+BUILD="$(git rev-list --count HEAD 2>/dev/null || echo 1)"
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD" "$APP/Contents/Info.plist"
 
 # App icon: the app draws its own picture, which is scaled to each size and bundled
 ICONS="$(mktemp -d)/AppIcon.iconset"

@@ -1,0 +1,44 @@
+name: Release
+
+# Pushing a tag like v2.1.0 builds the app and publishes a GitHub release with the zip and dmg.
+# See docs/RELEASING.md
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check that the tag matches the app version
+        run: |
+          VERSION="$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" Resources/Info.plist)"
+          if [ "v$VERSION" != "$GITHUB_REF_NAME" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match the version in Resources/Info.plist ($VERSION)"
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Build and package
+        run: make release
+
+      - name: Write the release notes
+        run: |
+          # This version's section of the changelog, followed by the install note
+          awk -v v="$VERSION" '$0 ~ "^## " v { on = 1; next } /^## / { on = 0 } on' CHANGELOG.md > "$RUNNER_TEMP/notes.md"
+          cat docs/release-footer.md >> "$RUNNER_TEMP/notes.md"
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" "build/PixelCat-$VERSION.zip" "build/PixelCat-$VERSION.dmg" \
+            --title "Do It Meow $VERSION" --notes-file "$RUNNER_TEMP/notes.md"

@@ -593,6 +593,10 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
             note,
             keyed("st.feed", check("Give the cat food when I finish a to-do", #selector(AppDelegate.toggleFeedOnDone))),
             label("Quick add from any app: Control-Option-T", size: 12, color: .secondaryLabelColor),
+            caption("Updates"),
+            keyed("st.autoUpdate", check("Check for updates automatically", #selector(AppDelegate.toggleAutoUpdate))),
+            hstack([button("Check Now", #selector(AppDelegate.checkForUpdates)),
+                    keyed("st.version", label("", size: 12, color: .secondaryLabelColor))]),
             caption("Behavior"),
             keyed("st.wander", check("Wander around", #selector(AppDelegate.toggleWander))),
             keyed("st.quips", check("Cat chatter", #selector(AppDelegate.toggleQuips))),
@@ -738,6 +742,8 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
         (controls["st.wander"] as? NSButton)?.state = app.wanderOn ? .on : .off
         (controls["st.quips"] as? NSButton)?.state = app.quipsOn ? .on : .off
         (controls["st.feed"] as? NSButton)?.state = app.feedOnDone ? .on : .off
+        (controls["st.autoUpdate"] as? NSButton)?.state = app.updater.automatic ? .on : .off
+        set("st.version", "Version \(app.updater.currentVersion)")
         (controls["st.login"] as? NSButton)?.state = SMAppService.mainApp.status == .enabled ? .on : .off
         set("st.loginNote", loginNote.isEmpty
             ? "Only works while the app stays where it is now, so keep it somewhere permanent."
@@ -1050,6 +1056,7 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
         _ = add(app.ballPanel.isVisible ? "Put Away Yarn Ball" : "Throw Yarn Ball", #selector(AppDelegate.toggleBall), target: app)
         _ = add(app.asleep ? "Wake Up" : "Put to Sleep", #selector(AppDelegate.toggleSleep), target: app)
         menu.addItem(.separator())
+        _ = add("Check for Updates…", #selector(AppDelegate.checkForUpdates), target: app)
         _ = add("Quit Pixel Cat", #selector(AppDelegate.quit), target: app)
     }
 
@@ -1081,7 +1088,8 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
         }
 
         let appMenu = submenu("Pixel Cat")
-        add(appMenu, "About Pixel Cat", #selector(NSApplication.orderFrontStandardAboutPanel(_:)))
+        add(appMenu, "About Pixel Cat", #selector(AppDelegate.showAbout), target: app)
+        add(appMenu, "Check for Updates…", #selector(AppDelegate.checkForUpdates), target: app)
         appMenu.addItem(.separator())
         add(appMenu, "Settings…", #selector(showSettings), ",", target: self)
         appMenu.addItem(.separator())
@@ -1210,32 +1218,6 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
             return true
         }
         return false
-    }
-
-    // For testing: follows the same path as clicking the first to-do's clock, picking a time a few seconds away and pressing Set
-    func testSetDue(after seconds: TimeInterval) -> Bool {
-        show(page: 1)
-        guard let t = table, t.numberOfRows > 0,
-              let button = t.view(atColumn: 2, row: 0, makeIfNecessary: true) as? NSButton else { return false }
-        showDue(button)
-        duePicker?.dateValue = Date().addingTimeInterval(seconds)
-        dueSet()
-        return app.store.todos.first?.due != nil
-    }
-
-    // For testing: follows the same path as typing in the blank row and pressing Return, then reports whether the cursor came back to the blank row
-    func testBlankRow(_ text: String, then report: @escaping (Bool) -> Void) {
-        show(page: 1)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-            guard let self, let field = self.addField else { return report(false) }
-            self.focusBlankRow()
-            field.stringValue = text
-            self.addFromField(field)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                let editing = ((self.window?.firstResponder as? NSTextView)?.delegate as? NSTextField) === field
-                report(editing && field.stringValue.isEmpty)
-            }
-        }
     }
 
     // MARK: Screenshots

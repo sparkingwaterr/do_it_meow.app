@@ -1446,8 +1446,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         start.y += peekDrop
         catView.standUp()
         let dist = hypot(target.x - start.x, target.y - start.y)
-        let frames = max(12, min(30, Int(dist / 22)))
-        let peak = min(120, 30 + dist * 0.15)
+        // 거리에 맞춰 시간을 늘린다 (뛰는 속도의 2.5배쯤). 멀리 갈 때 순간이동처럼 보이지 않게
+        let frames = max(18, min(120, Int(dist / (runSpeed * 2.5))))
+        let peak = min(140, 30 + dist * 0.12)
         catView.facingRight = target.x > start.x
         catView.running = true
         catView.walkFrame = 1
@@ -1460,6 +1461,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 return
             }
             n += 1
+            self.catView.walkFrame = self.stepFrame(n, run: true)  // 공중에서도 발을 구른다
             let k = CGFloat(n) / CGFloat(frames)
             self.moveCat(to: NSPoint(x: start.x + (target.x - start.x) * k,
                                      y: start.y + (target.y - start.y) * k + peak * 4 * k * (1 - k)))

@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- **Stay on top of windows.** A setting that keeps the cat on window tops and off the rest of the screen. Reminders and timers then show as a speech bubble where the cat is instead of sending it running to your cursor.
+- Speech bubbles appear below the cat when it sits at the very top of the screen.
+
 ## 2.1.0
 
 - **Updates.** The app checks GitHub once a day for a newer version and can install it and relaunch. Use "Check for Updates…" in the menu bar paw menu, or turn the automatic check off in Settings.

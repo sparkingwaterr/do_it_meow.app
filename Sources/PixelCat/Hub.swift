@@ -598,6 +598,9 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
             hstack([button("Check Now", #selector(AppDelegate.checkForUpdates)),
                     keyed("st.version", label("", size: 12, color: .secondaryLabelColor))]),
             caption("Behavior"),
+            keyed("st.stay", check("Stay on top of windows, out of the way", #selector(AppDelegate.toggleStayOnWindows))),
+            label("The cat keeps off the rest of the screen, and reminders show as a speech bubble instead of it running to you.",
+                  size: 11, color: .secondaryLabelColor),
             keyed("st.wander", check("Wander around", #selector(AppDelegate.toggleWander))),
             keyed("st.quips", check("Cat chatter", #selector(AppDelegate.toggleQuips))),
             slider("runSpeed", "Run speed", 1.5...7, "slow", "fast"),
@@ -740,6 +743,7 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
 
         // Settings
         (controls["st.wander"] as? NSButton)?.state = app.wanderOn ? .on : .off
+        (controls["st.stay"] as? NSButton)?.state = app.stayOnWindows ? .on : .off
         (controls["st.quips"] as? NSButton)?.state = app.quipsOn ? .on : .off
         (controls["st.feed"] as? NSButton)?.state = app.feedOnDone ? .on : .off
         (controls["st.autoUpdate"] as? NSButton)?.state = app.updater.automatic ? .on : .off

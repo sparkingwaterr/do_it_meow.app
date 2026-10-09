@@ -588,6 +588,8 @@ final class QuipView: NSView {
     static let heartPx: CGFloat = 2
     var text = "" { didSet { needsDisplay = true } }
     var showsHeart = false { didSet { needsDisplay = true } }  // A pink heart instead of text
+    var tailOnTop = false { didSet { needsDisplay = true } }   // The bubble sits below the cat, tail pointing up
+    var tailX: CGFloat? { didSet { needsDisplay = true } }     // Where the tail starts; centred when nil
 
     override var isFlipped: Bool { true }
 
@@ -601,19 +603,20 @@ final class QuipView: NSView {
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        let body = NSRect(x: 0, y: 0, width: bounds.width, height: bounds.height - BubbleView.tailH)
-        drawPixelBubble(body: body, tailX: bounds.width / 2 - BubbleView.u * 2, tailOnTop: false)
+        let top = tailOnTop ? BubbleView.tailH : 0
+        let body = NSRect(x: 0, y: top, width: bounds.width, height: bounds.height - BubbleView.tailH)
+        drawPixelBubble(body: body, tailX: tailX ?? bounds.width / 2 - BubbleView.u * 2, tailOnTop: tailOnTop)
         if showsHeart {
             colors["P"]?.setFill()
             for (y, row) in Self.heart.enumerated() {
                 for (x, ch) in row.enumerated() where ch == "P" {
-                    NSRect(x: 9 + CGFloat(x) * Self.heartPx, y: 7 + CGFloat(y) * Self.heartPx,
+                    NSRect(x: 9 + CGFloat(x) * Self.heartPx, y: top + 7 + CGFloat(y) * Self.heartPx,
                            width: Self.heartPx, height: Self.heartPx).fill()
                 }
             }
             return
         }
-        (text as NSString).draw(at: NSPoint(x: 11, y: 5), withAttributes: [.font: Self.font, .foregroundColor: ink])
+        (text as NSString).draw(at: NSPoint(x: 11, y: top + 5), withAttributes: [.font: Self.font, .foregroundColor: ink])
     }
 }
 
@@ -1050,7 +1053,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var quipPanel: NSPanel!
     var quip: QuipView!
     var quipToken = 0
+    var quipStickyUntil = Date.distantPast
     var quipsOn = false  // The small bubbles where the cat talks to itself
+    // Out-of-the-way mode: the cat lives on top of windows only, and reminders appear as a speech bubble
+    // where it is instead of sending it running to the cursor
+    var stayOnWindows = false
 
     var wanderOn = true
     var motion: Timer?   // Exists only while a walk or jump is in progress
@@ -1099,7 +1106,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var bodyHeight: CGFloat { CGFloat(catView.design.rows.count) * catView.px }
     // While the paws hook over the edge, lower the panel by that much so they hang below it
     var peekDrop: CGFloat { catView.inPeek ? CGFloat(pawOverhang) * catView.px : 0 }
-    var idle: Bool { motion == nil && !asleep && !playing && !away && !catView.isBusy && !bubblePanel.isVisible }
+    var idle: Bool {
+        motion == nil && !asleep && !playing && !away && !ringing && !catView.isBusy && !bubblePanel.isVisible
+    }
 
     // Away from the floor line, somewhere on screen, because of ball play or a reminder. The current spot must not be saved as the floor
     var away = false
@@ -1202,6 +1211,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         wanderOn = d.object(forKey: "wander") == nil || d.bool(forKey: "wander")
         quipsOn = d.bool(forKey: "quips")
+        stayOnWindows = d.bool(forKey: "stayOnWindows")
         if d.object(forKey: "runSpeed") != nil { runSpeed = CGFloat(d.double(forKey: "runSpeed")) }
         if d.object(forKey: "pace") != nil { pace = max(2, d.double(forKey: "pace")) }
         if d.object(forKey: "climbChance") != nil { climbChance = d.integer(forKey: "climbChance") }
@@ -1279,13 +1289,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     // `force` shows it even when chatter is off (for things that must be said, like a reminder)
-    func say(_ text: String, force: Bool = false, seconds: Double = 2.4) {
-        guard quipsOn || force else { return }
+    // `keepPose` leaves a cat that is hanging on a window where it is instead of making it sit up to talk
+    func say(_ text: String, force: Bool = false, seconds: Double = 2.4, keepPose: Bool = false) {
+        guard quipsOn || force, Date() >= quipStickyUntil || keepPose else { return }
         if bubblePanel.isVisible {
             guard force else { return }
             bubblePanel.orderOut(nil)
         }
-        sitUpUntil = max(sitUpUntil, Date() + seconds + 0.2)
+        if !keepPose { sitUpUntil = max(sitUpUntil, Date() + seconds + 0.2) }
         quip.showsHeart = false
         quip.text = text
         showQuip(for: seconds)
@@ -1293,25 +1304,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // The heart shown when petted. It appears even when chatter is off
     func showHeart() {
-        guard !asleep, !bubblePanel.isVisible else { return }
+        guard !asleep, !bubblePanel.isVisible, Date() >= quipStickyUntil else { return }
         quip.showsHeart = true
         showQuip(for: 1.6)
     }
 
     func showQuip(for seconds: Double) {
-        let size = quip.neededSize
-        let cat = catPanel.frame
-        quipPanel.setFrame(NSRect(x: cat.midX - size.width / 2, y: cat.minY + bodyHeight + 3,
-                                  width: size.width, height: size.height), display: true)
+        positionQuip()
         quipPanel.orderFrontRegardless()
         quipToken += 1
         let token = quipToken
         DispatchQueue.main.asyncAfter(deadline: .now() + seconds) { [weak self] in
-            if self?.quipToken == token { self?.quipPanel.orderOut(nil) }
+            if self?.quipToken == token { self?.hideQuip(force: true) }
         }
     }
 
-    func hideQuip() {
+    func positionQuip() {
+        let size = quip.neededSize
+        let cat = catPanel.frame
+        let screen = (NSScreen.screens.first { $0.frame.contains(NSPoint(x: cat.midX, y: cat.minY + 1)) }
+            ?? NSScreen.main)?.frame ?? cat
+        // Above the cat when there is room; otherwise (at the top of the screen) below it with the tail pointing up
+        var y = cat.minY + bodyHeight + 3
+        quip.tailOnTop = y + size.height > screen.maxY
+        if quip.tailOnTop { y = cat.minY - size.height - 3 }
+        let x = min(max(cat.midX - size.width / 2, screen.minX + 4), max(screen.minX + 4, screen.maxX - size.width - 4))
+        quip.tailX = min(max(cat.midX - x - BubbleView.u * 2, 8), size.width - 20)
+        quipPanel.setFrame(NSRect(x: x, y: y, width: size.width, height: size.height), display: true)
+    }
+
+    // An announcement made in place stays up until it is dismissed; it is moved along with the cat instead of hidden
+    func hideQuip(force: Bool = false) {
+        if !force && Date() < quipStickyUntil { return }
+        quipStickyUntil = .distantPast
         quipToken += 1
         quipPanel.orderOut(nil)
     }
@@ -1346,6 +1371,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func moveCat(to origin: NSPoint) {
         guard origin != catPanel.frame.origin else { return }
         catPanel.setFrameOrigin(origin)
+        if quipPanel.isVisible && Date() < quipStickyUntil { positionQuip() }
         if bubblePanel.isVisible { layoutBubble() }
     }
 
@@ -1362,7 +1388,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let wins = visibleWindows()
         guard let i = wins.firstIndex(where: { $0.id == p.id }) else {
             log("perch window gone")
-            dropToFloor()
+            leavePerch()
             return
         }
         let f = wins[i].frame
@@ -1384,7 +1410,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let onScreen = NSScreen.screens.contains { $0.frame.contains(NSPoint(x: foot.x, y: f.maxY + bodyHeight - 1)) }
         if !onScreen || wins[..<i].contains(where: { $0.frame.contains(foot) }) {
             log("perch covered or off screen")
-            dropToFloor()
+            leavePerch()
             return
         }
         if let offset = bowlPerchOffset, bowlPanel.isVisible, !bowlHeld {
@@ -1507,6 +1533,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         RunLoop.main.add(t, forMode: .common)
         motion = t
+    }
+
+    // The window being sat on is no longer usable. In stay-on-windows mode move to another window if there is one
+    func leavePerch() {
+        if stayOnWindows && hopOntoWindow(frontOnly: false) { return }
+        dropToFloor()
     }
 
     func dropToFloor(then done: (() -> Void)? = nil) {
@@ -1965,7 +1997,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func watchMouse() {
-        guard wanderOn, idle, perch == nil, !hasFood, Date() > lastFollow + 8 else { return }
+        guard wanderOn, !stayOnWindows, idle, perch == nil, !hasFood, Date() > lastFollow + 8 else { return }
         let cat = catPanel.frame
         let mouse = NSEvent.mouseLocation
         let dist = hypot(mouse.x - cat.midX, mouse.y - (cat.minY + bodyHeight / 2))
@@ -2005,7 +2037,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         let roll = Int.random(in: 0..<100)
-        if perch != nil {
+        if stayOnWindows {
+            // Get onto a window and stay there: no strolling, chasing or coming down. With no window to sit on, wait
+            if perch == nil {
+                hopOntoWindow(frontOnly: false)
+            } else if Int.random(in: 0..<100) < sleepChance / 2 {
+                fallAsleep()
+            } else if roll >= 92 {
+                hopOntoWindow(frontOnly: false)
+            }
+        } else if perch != nil {
             // On a window, almost always hang and peek; move only now and then
             if Int.random(in: 0..<100) < sleepChance / 2 {
                 fallAsleep()
@@ -2066,6 +2107,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(withTitle: ballPanel.isVisible ? "Put Away Yarn Ball" : "Throw Yarn Ball",
                      action: #selector(toggleBall), keyEquivalent: "").target = self
         menu.addItem(withTitle: asleep ? "Wake Up" : "Put to Sleep", action: #selector(toggleSleep), keyEquivalent: "").target = self
+        let stay = menu.addItem(withTitle: "Stay on Windows", action: #selector(toggleStayOnWindows), keyEquivalent: "")
+        stay.target = self
+        stay.state = stayOnWindows ? .on : .off
         let wander = menu.addItem(withTitle: "Wander Around", action: #selector(toggleWander), keyEquivalent: "")
         wander.target = self
         wander.state = wanderOn ? .on : .off
@@ -2190,6 +2234,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func comeDown() {
         guard perch != nil, !catView.pressed else { return }
         dropToFloor()
+    }
+
+    @objc func toggleStayOnWindows() {
+        stayOnWindows.toggle()
+        UserDefaults.standard.set(stayOnWindows, forKey: "stayOnWindows")
+        if stayOnWindows && perch == nil && idle { hopOntoWindow(frontOnly: false) }
+        hub.refresh()
     }
 
     @objc func checkForUpdates() { updater.check(userInitiated: true) }
@@ -2325,6 +2376,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         log("announce: \(text)")
         NSSound(named: "Glass")?.play()
         wake()
+        if stayOnWindows {  // Say it from where the cat is, without leaving its window
+            quipStickyUntil = Date() + hold
+            say(text, force: true, seconds: hold, keepPose: true)
+            return
+        }
         if playing { stopPlay() }
         if catView.inPeek {
             catPanel.setFrameOrigin(NSPoint(x: catPanel.frame.minX, y: catPanel.frame.minY + peekDrop))
@@ -2413,7 +2469,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ringToken += 1
         ringTimer?.invalidate()
         ringTimer = nil
-        hideQuip()
+        hideQuip(force: true)
         awayUntil = .distantPast
         if returnHome && away && !playing && !catView.pressed {
             cancelMotion()

@@ -24,6 +24,7 @@ It sits above every window and has a life of its own.
 - **Eats** when you put out food, and **chases a yarn ball** all over the screen. You can grab the ball and fling it.
 - **Likes being petted.** Stroke it with the mouse for a heart.
 - **Comes to get you.** When a reminder or timer goes off, it runs to your cursor and rings until you click it.
+- **Or stays out of the way.** Turn on *Stay on top of windows* and it keeps to window tops, announcing reminders with a speech bubble instead.
 
 <p align="center">
   <img src="docs/screenshots/run-sheet.png" width="640" alt="Running frames">
@@ -118,7 +119,7 @@ How much is done, your streak, the last 7 days, the cat's mood, and what is comi
 </details>
 
 <details>
-<summary><b>Settings</b> · Launch at login and sliders for how busy, sleepy, and clingy the cat is.</summary>
+<summary><b>Settings</b> · Launch at login, updates, an out-of-the-way mode, and sliders for how busy, sleepy, and clingy the cat is.</summary>
 <br>
 
 | Light | Dark |

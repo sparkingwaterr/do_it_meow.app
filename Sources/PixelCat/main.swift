@@ -625,11 +625,14 @@ final class RowView: NSView {
     let deleteButton: NSButton
     var onToggle: (() -> Void)?
     var onDelete: (() -> Void)?
+    var onEdit: ((String) -> Void)?  // The text was changed in place
+    private let original: String
 
     override var isFlipped: Bool { true }
 
     init(frame: NSRect, todo: Todo) {
         done = todo.done
+        original = todo.text
         deleteButton = NSButton(title: "×", target: nil, action: nil)
         super.init(frame: frame)
 
@@ -638,10 +641,18 @@ final class RowView: NSView {
             .foregroundColor: todo.done ? NSColor(white: 0.62, alpha: 1) : ink,
         ]
         if todo.done { attrs[.strikethroughStyle] = NSUnderlineStyle.single.rawValue }
-        let label = NSTextField(labelWithAttributedString: NSAttributedString(string: todo.text, attributes: attrs))
-        label.lineBreakMode = .byTruncatingTail
-        label.frame = NSRect(x: 22, y: 2, width: frame.width - 22 - 20, height: 18)
-        addSubview(label)
+        // The text is edited in place: click it, type, press Return. The checkbox on the left ticks the item off
+        let field = NSTextField(string: todo.text)
+        field.attributedStringValue = NSAttributedString(string: todo.text, attributes: attrs)
+        field.isBordered = false
+        field.drawsBackground = false
+        field.focusRingType = .none
+        field.lineBreakMode = .byTruncatingTail
+        field.cell?.usesSingleLineMode = true
+        field.target = self
+        field.action = #selector(textEdited(_:))
+        field.frame = NSRect(x: 22, y: 2, width: frame.width - 22 - 20, height: 18)
+        addSubview(field)
 
         deleteButton.isBordered = false
         deleteButton.font = NSFont.systemFont(ofSize: 14, weight: .bold)
@@ -656,7 +667,7 @@ final class RowView: NSView {
 
     override func hitTest(_ point: NSPoint) -> NSView? {
         guard let hit = super.hitTest(point) else { return nil }
-        return hit === deleteButton ? hit : self
+        return convert(point, from: superview).x < 20 ? self : hit  // Left of the text is the checkbox
     }
 
     override func draw(_ dirtyRect: NSRect) {
@@ -671,8 +682,21 @@ final class RowView: NSView {
         }
     }
 
-    override func mouseDown(with event: NSEvent) { onToggle?() }
-    @objc func deleteClicked() { onDelete?() }
+    // Finish any edit in progress first, so its text is saved before the list is rebuilt
+    override func mouseDown(with event: NSEvent) {
+        window?.makeFirstResponder(nil)
+        onToggle?()
+    }
+
+    @objc func deleteClicked() {
+        window?.makeFirstResponder(nil)
+        onDelete?()
+    }
+
+    @objc func textEdited(_ sender: NSTextField) {
+        let text = sender.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        if text != original { onEdit?(text) }
+    }
 }
 
 final class BubbleView: NSView, NSTextViewDelegate {
@@ -704,6 +728,7 @@ final class BubbleView: NSView, NSTextViewDelegate {
     private var confirmDeleteUntil = Date.distantPast  // Pressing × again before this time deletes the memo
     private let noteScroll = NSTextView.scrollableTextView()
     private var noteText: NSTextView { noteScroll.documentView as! NSTextView }
+    private var rebuilding = false
     private var dynamic: [NSView] = []  // Views rebuilt on every redraw (the heading and the to-do rows)
 
     override var isFlipped: Bool { true }
@@ -770,6 +795,8 @@ final class BubbleView: NSView, NSTextViewDelegate {
     }
 
     func rebuild() {
+        rebuilding = true
+        defer { rebuilding = false }
         dynamic.forEach { $0.removeFromSuperview() }
         dynamic = []
         setFrameSize(neededSize)
@@ -818,12 +845,24 @@ final class BubbleView: NSView, NSTextViewDelegate {
             for (i, todo) in store.todos.enumerated() {
                 let row = RowView(frame: NSRect(x: Self.pad, y: y, width: inner, height: Self.rowH), todo: todo)
                 row.onToggle = { [weak self] in
-                    self?.store.todos[i].done.toggle()
-                    self?.onChange?()
+                    guard let self, self.store.todos.indices.contains(i) else { return }
+                    self.store.todos[i].done.toggle()
+                    self.onChange?()
                 }
                 row.onDelete = { [weak self] in
-                    self?.store.todos.remove(at: i)
-                    self?.onChange?()
+                    guard let self, self.store.todos.indices.contains(i) else { return }
+                    self.store.todos.remove(at: i)
+                    self.onChange?()
+                }
+                row.onEdit = { [weak self] text in
+                    // Ignore edits that surface while the rows are being torn down and rebuilt
+                    guard let self, !self.rebuilding, self.store.todos.indices.contains(i) else { return }
+                    if text.isEmpty {
+                        self.store.todos.remove(at: i)  // Clearing the text deletes the item
+                    } else {
+                        self.store.todos[i].text = text
+                    }
+                    self.onChange?()
                 }
                 addSubview(row)
                 dynamic.append(row)

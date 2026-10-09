@@ -188,33 +188,11 @@ final class Hub: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewD
         updateStatusTitle()
     }
 
-    // 메뉴 막대 아이콘: 가는 선으로 그린 작은 고양이 얼굴. 귀, 눈 두 개, 코, 양옆으로 뻗은 수염.
-    // 밝은 메뉴 막대에서는 검게, 어두운 메뉴 막대에서는 희게 저절로 바뀐다
-    static let menuBarCat = [
-        "..K.......K..",
-        "..KK.....KK..",
-        "..K.KKKKK.K..",
-        "..K.......K..",
-        "..K.K...K.K..",
-        "KKK.......KKK",
-        "..K...K...K..",
-        "KKK.......KKK",
-        "...KKKKKKK...",
-    ]
-
-    static func menuBarIcon() -> NSImage {
-        let unit: CGFloat = 1.5  // 레티나 화면에서 한 칸이 3픽셀
-        let size = NSSize(width: CGFloat(menuBarCat[0].count) * unit, height: CGFloat(menuBarCat.count) * unit)
-        let image = NSImage(size: size, flipped: true) { _ in
-            NSColor.black.setFill()
-            for (y, row) in menuBarCat.enumerated() {
-                for (x, ch) in row.enumerated() where ch == "K" {
-                    NSRect(x: CGFloat(x) * unit, y: CGFloat(y) * unit, width: unit, height: unit).fill()
-                }
-            }
-            return true
-        }
-        image.isTemplate = true
+    // 메뉴 막대 아이콘: 부드러운 고양이 발바닥 (시스템 기호). 메뉴 막대 밝기에 맞춰 검정/흰색으로 저절로 바뀐다
+    static func menuBarIcon() -> NSImage? {
+        let image = NSImage(systemSymbolName: "pawprint.fill", accessibilityDescription: "Pixel Cat")?
+            .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 14, weight: .regular))
+        image?.isTemplate = true
         return image
     }
 

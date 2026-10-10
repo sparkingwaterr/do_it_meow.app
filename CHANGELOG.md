@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Clicking the cat is more reliable.** A click that wobbles a few points no longer counts as a drag, and a cat hanging on a window holds still while the mouse button is down. Before, such clicks moved the cat instead of opening the bubble.
 - **Edit to-dos in the cat's bubble.** Click the text, change it, and press Return. The checkbox ticks the item off; clearing the text deletes it.
 - **Stay on top of windows.** A setting that keeps the cat on window tops and off the rest of the screen. Reminders and timers then show as a speech bubble where the cat is instead of sending it running to your cursor.
   Throwing the yarn ball switches the setting off, since play ranges over the whole screen.

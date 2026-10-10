@@ -410,7 +410,9 @@ final class CatView: NSView {
     override func mouseDragged(with event: NSEvent) {
         let m = NSEvent.mouseLocation
         let dx = m.x - dragStartMouse.x, dy = m.y - dragStartMouse.y
-        if !dragged && abs(dx) < 3 && abs(dy) < 3 { return }
+        // A click often wobbles a few points, more so on a small target at the screen edge. Only a clear pull
+        // counts as a drag; anything less stays a click
+        if !dragged && hypot(dx, dy) < 8 { return }
         dragged = true
         window?.setFrameOrigin(NSPoint(x: dragStartOrigin.x + dx, y: dragStartOrigin.y + dy))
         onMove?()
@@ -1416,10 +1418,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // Follow the window being sat on when it moves, and come down to the floor if it disappears or gets covered
     func follow() {
-        guard let p = perch, !catView.pressed else {
+        guard let p = perch else {
             catView.sinkTarget = 0
             return
         }
+        // While the mouse button is down, hold still: the cat must not slip out from under a click.
+        // If the press turns into a drag, catDragged takes over
+        if catView.pressed { return }
         // On a window the default is to peek. The cat only rises when talking, eating or running.
         // Clicking it opens the bubble while it keeps hanging
         let hiding = (motion == nil || creeping) && !hasFood && Date() > sitUpUntil

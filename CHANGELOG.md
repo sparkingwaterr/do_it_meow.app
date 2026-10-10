@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2.1.1
 
 - **Clicking the cat is more reliable.** A click that wobbles a few points no longer counts as a drag, and a cat hanging on a window holds still while the mouse button is down. Before, such clicks moved the cat instead of opening the bubble.
 - **Edit to-dos in the cat's bubble.** Click the text, change it, and press Return. The checkbox ticks the item off; clearing the text deletes it.
